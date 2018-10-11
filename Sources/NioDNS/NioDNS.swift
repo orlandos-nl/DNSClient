@@ -10,13 +10,14 @@ class NioDNS {
     let host: String
 
     public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
-        let bootstrap = ClientBootstrap(group: group)
-                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-                .channelInitializer { channel in
-                    return NioDNS.initialize(pipeline: channel.pipeline, hostname: host)
-                }
+        let bootstrap = DatagramBootstrap(group: group)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelInitializer { channel in
+                return NioDNS.initialize(pipeline: channel.pipeline, hostname: host)
+            }
 
-        return bootstrap.bind(host: host, port: 53).map { channel in
+        return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
             return NioDNS(channel: channel, host: host)
         }
     }
@@ -27,7 +28,7 @@ class NioDNS {
     }
     
     func sendMessage(_ message: Message) {
-        _ = self.channel.writeAndFlush(message)
+        try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: host, port: 53), data: message), promise: nil)
     }
 
     static func initialize(pipeline: ChannelPipeline, hostname: String) -> EventLoopFuture<Void> {
@@ -51,11 +52,16 @@ class NioDNS {
     }
 }
 
-private final class DNSEncoder: MessageToByteEncoder {
-    typealias OutboundIn = Message
+private final class DNSEncoder: ChannelOutboundHandler {
+    typealias OutboundIn = AddressedEnvelope<Message>
+    typealias OutboundOut = AddressedEnvelope<ByteBuffer>
     
-    func encode(ctx: ChannelHandlerContext, data: Message, out: inout ByteBuffer) throws {
-        let header = data.header
+    func write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let data = self.unwrapOutboundIn(data)
+        let message = data.data
+        var out = ctx.channel.allocator.buffer(capacity: 512)
+        
+        let header = message.header
         let endianness = Endianness.big
         
         out.write(integer: header.id, endianness: endianness)
@@ -65,7 +71,7 @@ private final class DNSEncoder: MessageToByteEncoder {
         out.write(integer: header.authorityCount, endianness: endianness)
         out.write(integer: header.additionalRecordCount, endianness: endianness)
         
-        for question in data.questions {
+        for question in message.questions {
             for label in question.labels {
                 out.write(integer: label.length, endianness: endianness)
                 out.write(bytes: label.label)
@@ -76,16 +82,23 @@ private final class DNSEncoder: MessageToByteEncoder {
             out.write(integer: question.questionClass.rawValue, endianness: endianness)
         }
         
-        print(out.getBytes(at: 0, length: out.readableBytes))
-        print("break")
+        ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
     }
 }
 
-private final class DNSDecoder: ByteToMessageDecoder {
-    var cumulationBuffer: ByteBuffer?
+private final class DNSDecoder: ChannelInboundHandler {
+    public typealias InboundIn = AddressedEnvelope<ByteBuffer>
     
-    func decode(ctx: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
-        print(buffer.readBytes(length: buffer.readableBytes))
-        return .continue
+    public func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
+        let envelope = self.unwrapInboundIn(data)
+        var buffer = envelope.data
+        
+        // To begin with, the chat messages are simply whole datagrams, no other length.
+        guard let message = buffer.readString(length: buffer.readableBytes) else {
+            print("Error: invalid string received")
+            return
+        }
+        
+        print("\(envelope.remoteAddress): \(message)")
     }
 }
