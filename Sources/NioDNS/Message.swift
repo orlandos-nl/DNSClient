@@ -69,7 +69,7 @@ struct MessageHeader {
     let additionalRecordCount: UInt16
 }
 
-struct QuesstionLabel: ExpressibleByStringLiteral {
+struct QuestionLabel: ExpressibleByStringLiteral {
     let length: UInt8
     
     // Max UInt8.max in length
@@ -79,9 +79,15 @@ struct QuesstionLabel: ExpressibleByStringLiteral {
         self.init(string: value)
     }
     
+    init(bytes: [UInt8]) {
+        assert(bytes.count < 64)
+        
+        self.label = bytes
+        self.length = UInt8(bytes.count)
+    }
+    
     init(string: String) {
-        label = Array(string.utf8)
-        length = UInt8(label.count)
+        self.init(bytes: Array(string.utf8))
     }
 }
 
@@ -136,7 +142,7 @@ enum DataClass: UInt16 {
 }
 
 struct QuestionSection {
-    let labels: [QuesstionLabel]
+    let labels: [QuestionLabel]
     let type: QuestionType
     let questionClass: DataClass
 }
@@ -147,12 +153,12 @@ struct ResourceData {
 }
 
 struct ResourceRecord {
-    let domainName: String
+    let domainName: [QuestionLabel]
     let dataType: ResourceType
     let dataClass: DataClass
     let ttl: UInt32
-    let resourceDataLengta: UInt16
-    let resourceDataa: ResourceData
+    let resourceDataLength: UInt16
+    let resourceData: ResourceData
 }
 
 // TODO: https://tools.ietf.org/html/rfc1035 section 4.1.4 compression
