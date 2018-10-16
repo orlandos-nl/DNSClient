@@ -108,32 +108,16 @@ enum ResourceType: UInt16 {
     case mInfo
     case mx
     case txt
-}
+    case srv = 33
 
-enum QuestionType: UInt16 {
-    case a = 1
-    case ns
-    case md
-    case mf
-    case cName
-    case soa
-    case mb
-    case mg
-    case mr
-    case null
-    case wks
-    case ptr
-    case hInfo
-    case mInfo
-    case mx
-    case txt
-    
     // QuestionType exclusive
     case axfr = 252
     case mailB = 253
     case mailA = 254
     case any = 255
 }
+
+typealias QuestionType = ResourceType
 
 enum DataClass: UInt16 {
     case internet = 1

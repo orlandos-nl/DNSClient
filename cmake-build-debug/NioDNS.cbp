@@ -666,7 +666,13 @@
 		<Unit filename="/media/kurozero/Data/CLionProjects/NioDNS/Package.swift">
 			<Option target="NioDNS"/>
 		</Unit>
+		<Unit filename="/media/kurozero/Data/CLionProjects/NioDNS/Sources/NioDNS/Message.swift">
+			<Option target="NioDNS"/>
+		</Unit>
 		<Unit filename="/media/kurozero/Data/CLionProjects/NioDNS/Sources/NioDNS/NioDNS.swift">
+			<Option target="NioDNS"/>
+		</Unit>
+		<Unit filename="/media/kurozero/Data/CLionProjects/NioDNS/Sources/NioDNS/main.swift">
 			<Option target="NioDNS"/>
 		</Unit>
 		<Unit filename="/media/kurozero/Data/CLionProjects/NioDNS/Tests/LinuxMain.swift">

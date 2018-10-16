@@ -229,20 +229,25 @@ private final class DNSDecoder: ChannelInboundHandler {
             
             questions.append(question)
         }
-        
-        var records = [ResourceRecord]()
-        
-        for _ in 0..<header.answerCount {
-            guard let record = buffer.readRecord() else {
-                ctx.fireErrorCaught(ProtocolError())
-                return
+
+        func resourceRecords(count: UInt16) -> [ResourceRecord] {
+            var records = [ResourceRecord]()
+
+            for _ in 0..<count {
+                guard let record = buffer.readRecord() else {
+                    ctx.fireErrorCaught(ProtocolError())
+                    return []
+                }
+
+                records.append(record)
             }
-            
-            records.append(record)
+
+            return records
         }
-        
         print(header)
         print(questions)
-        print(records)
+        print(resourceRecords(count: header.answerCount))
+        print(resourceRecords(count: header.authorityCount))
+        print(resourceRecords(count: header.additionalRecordCount))
     }
 }
