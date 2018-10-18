@@ -1,111 +1,86 @@
 import NIO
-import CResolvHelpers
-import Darwin
 
-let initialized: Bool = {
-    initializeDNS()
-    return true
-}()
+class NioDNS: Resolver {
+    let channel: Channel
+    let host: String
+    let dnsDecoder: DNSDecoder
+    let loop: EventLoop
 
-class NioDNS {
-    deinit {
-        _ = channel.close(mode: .all)
+    var messageID: UInt16 = 0
+
+    public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
+        messageID = messageID &+ 1
+        let header = MessageHeader(id: messageID, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+        let question = QuestionSection(labels: ["google", "com"], type: .a, questionClass: .internet)
+        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+
+        let promise: EventLoopPromise<Message> = loop.newPromise()
+        dnsDecoder.messageCache[messageID] = promise
+        self.sendMessage(message)
+
+        return promise.futureResult.map { message in
+            return message.answers.compactMap { answer in
+                guard answer.resourceDataLength == 4 else {
+                    return nil
+                }
+
+                let ipAddress = answer.resourceData.data.withUnsafeBytes { buffer in
+                    return buffer.bindMemory(to: UInt32.self).baseAddress!.pointee
+                }
+
+                let sockaddr = sockaddr_in(sin_family: sa_family_t(AF_INET), sin_port: in_port_t(port), sin_addr: in_addr(s_addr: ipAddress), sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
+                return SocketAddress(sockaddr, host: host)
+            }
+        }
     }
 
-    let channel: Channel
-    let host: SocketAddress
-    
-    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
-        guard initialized else {
-            fatalError("Invalid state")
-        }
-        
-        let address = getHost()
-        
-        let bits = UInt32(UInt8.max)
-        let n0 = UInt8(address.sin_addr.s_addr & bits)
-        let n1 = UInt8(address.sin_addr.s_addr >> 8 & bits)
-        let n2 = UInt8(address.sin_addr.s_addr >> 16 & bits)
-        let n3 = UInt8(address.sin_addr.s_addr >> 24 & bits)
-        
-        let host = SocketAddress(address, host: "\(n0).\(n1).\(n2).\(n3)")
-        
-        let bootstrap = DatagramBootstrap(group: group)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
-            .channelInitializer { channel in
-                return NioDNS.initialize(pipeline: channel.pipeline)
-        }
-        
-        return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
-            return NioDNS(channel: channel, host: host)
+    public func initiateAAAAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
+        return loop.newFailedFuture(error: ProtocolError())
+    }
+
+    public func cancelQueries() {
+        for (id, promise) in dnsDecoder.messageCache {
+            dnsDecoder.messageCache[id] = nil
+            promise.fail(error: CancelError())
         }
     }
 
     public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
-        do {
-            let address = try SocketAddress(ipAddress: host, port: 53)
-            
-            let bootstrap = DatagramBootstrap(group: group)
-                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
-                .channelInitializer { channel in
-                    return NioDNS.initialize(pipeline: channel.pipeline)
-                }
+        let dnsDecoder = DNSDecoder()
 
-            return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
-                return NioDNS(channel: channel, host: address)
+        let bootstrap = DatagramBootstrap(group: group)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelInitializer { channel in
+                return channel.pipeline.add(handler: dnsDecoder).then {
+                    channel.pipeline.add(handler: DNSEncoder())
+                }
             }
-        } catch {
-            return group.next().newFailedFuture(error: error)
+
+        return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
+            return NioDNS(channel: channel, host: host, decoder: dnsDecoder)
         }
     }
 
-    init(channel: Channel, host: SocketAddress) {
+    deinit {
+        _ = channel.close(mode: .all)
+    }
+
+    init(channel: Channel, host: String, decoder: DNSDecoder) {
         self.channel = channel
         self.host = host
+        self.dnsDecoder = decoder
     }
     
     func sendMessage(_ message: Message) {
-        channel.writeAndFlush(AddressedEnvelope(remoteAddress: host, data: message), promise: nil)
-    }
-
-    static func initialize(pipeline: ChannelPipeline) -> EventLoopFuture<Void> {
-        return pipeline.add(handler: DNSDecoder()).then {
-            pipeline.add(handler: DNSEncoder())
-        }
+        try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: host, port: 53), data: message), promise: nil)
     }
 }
 
 fileprivate let endianness = Endianness.big
 
-private final class DNSEncoder: ChannelOutboundHandler {
-    typealias OutboundIn = AddressedEnvelope<Message>
-    typealias OutboundOut = AddressedEnvelope<ByteBuffer>
-    
-    func write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let data = self.unwrapOutboundIn(data)
-        let message = data.data
-        var out = ctx.channel.allocator.buffer(capacity: 512)
-        
-        let header = message.header
-        
-        out.write(header)
-        
-        for question in message.questions {
-            for label in question.labels {
-                out.write(integer: label.length, endianness: endianness)
-                out.write(bytes: label.label)
-            }
-            
-            out.write(integer: 0, endianness: endianness, as: UInt8.self)
-            out.write(integer: question.type.rawValue, endianness: endianness)
-            out.write(integer: question.questionClass.rawValue, endianness: endianness)
-        }
-        
-        ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
-    }
-}
+struct CancelError: Error {}
+struct ProtocolError: Error {}
 
 extension ByteBuffer {
     mutating func write(_ header: MessageHeader) {
@@ -208,8 +183,8 @@ extension ByteBuffer {
     mutating func readRecord() -> ResourceRecord? {
         guard
             let labels = readLabels(),
-            let typeNumber = readInteger(endianness: .big, as: UInt16.self),
-            let classNumber = readInteger(endianness: .big, as: UInt16.self),
+            let typeNumber = readInteger(endianness: endianness, as: UInt16.self),
+            let classNumber = readInteger(endianness: endianness, as: UInt16.self),
             let type = ResourceType(rawValue: typeNumber),
             let dataClass = DataClass(rawValue: classNumber),
             let ttl = readInteger(endianness: endianness, as: UInt32.self),
@@ -230,9 +205,37 @@ extension ByteBuffer {
     }
 }
 
-struct ProtocolError: Error {}
+final class DNSEncoder: ChannelOutboundHandler {
+    typealias OutboundIn = AddressedEnvelope<Message>
+    typealias OutboundOut = AddressedEnvelope<ByteBuffer>
 
-private final class DNSDecoder: ChannelInboundHandler {
+    func write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let data = self.unwrapOutboundIn(data)
+        let message = data.data
+        var out = ctx.channel.allocator.buffer(capacity: 512)
+
+        let header = message.header
+
+        out.write(header)
+
+        for question in message.questions {
+            for label in question.labels {
+                out.write(integer: label.length, endianness: endianness)
+                out.write(bytes: label.label)
+            }
+
+            out.write(integer: 0, endianness: endianness, as: UInt8.self)
+            out.write(integer: question.type.rawValue, endianness: endianness)
+            out.write(integer: question.questionClass.rawValue, endianness: endianness)
+        }
+
+        ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
+    }
+}
+
+final class DNSDecoder: ChannelInboundHandler {
+    var messageCache = [UInt16: EventLoopPromise<Message>]()
+
     public typealias InboundIn = AddressedEnvelope<ByteBuffer>
     
     public func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
@@ -269,10 +272,18 @@ private final class DNSDecoder: ChannelInboundHandler {
 
             return records
         }
-        print(header)
+
+        messageCache[header.id]?.succeed(result: Message(
+                header: header,
+                questions: questions,
+                answers: resourceRecords(count: header.answerCount),
+                authorities: resourceRecords(count: header.authorityCount),
+                additionalData: resourceRecords(count: header.additionalRecordCount)
+        ))
+        /*print(header)
         print(questions)
         print(resourceRecords(count: header.answerCount))
         print(resourceRecords(count: header.authorityCount))
-        print(resourceRecords(count: header.additionalRecordCount))
+        print(resourceRecords(count: header.additionalRecordCount))*/
     }
 }

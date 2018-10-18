@@ -7,7 +7,7 @@ print("Connected")
 func query() -> Message {
     let header = MessageHeader(id: 1, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
     let question = QuestionSection(labels: ["tweakers", "net"], type: .a, questionClass: .internet)
-    return Message(header: header, questions: [question])
+    return Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
 }
 
 /*func query() -> Message {
@@ -18,7 +18,7 @@ func query() -> Message {
 
 func status() -> Message {
     let header = MessageHeader(id: 1, options: [.serverStatusQuery], questionCount: 0, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-    return Message(header: header, questions: [])
+    return Message(header: header, questions: [], answers: [], authorities: [], additionalData: [])
 }
 
 dnsClient.sendMessage(query())

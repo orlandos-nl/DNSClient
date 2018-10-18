@@ -150,4 +150,7 @@ struct ResourceRecord {
 struct Message {
     let header: MessageHeader
     let questions: [QuestionSection]
+    let answers: [ResourceRecord]
+    let authorities: [ResourceRecord]
+    let additionalData: [ResourceRecord]
 }
