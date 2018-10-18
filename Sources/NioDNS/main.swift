@@ -21,9 +21,6 @@ func status() -> Message {
     return Message(header: header, questions: [], answers: [], authorities: [], additionalData: [])
 }
 
-dnsClient.sendMessage(query())
-sleep(10)
-
 //labels          63 octets or less
 //
 //names           255 octets or less

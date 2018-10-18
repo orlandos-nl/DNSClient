@@ -75,8 +75,8 @@ struct QuestionLabel: ExpressibleByStringLiteral {
     // Max UInt8.max in length
     let label: [UInt8]
     
-    init(stringLiteral value: String) {
-        self.init(string: value)
+    init(stringLiteral string: String) {
+        self.init(bytes: Array(string.utf8))
     }
     
     init(bytes: [UInt8]) {
@@ -84,10 +84,6 @@ struct QuestionLabel: ExpressibleByStringLiteral {
         
         self.label = bytes
         self.length = UInt8(bytes.count)
-    }
-    
-    init(string: String) {
-        self.init(bytes: Array(string.utf8))
     }
 }
 

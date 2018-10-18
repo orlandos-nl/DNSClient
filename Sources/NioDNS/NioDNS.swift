@@ -4,14 +4,17 @@ class NioDNS: Resolver {
     let channel: Channel
     let host: String
     let dnsDecoder: DNSDecoder
-    let loop: EventLoop
+    var loop: EventLoop {
+        return channel.eventLoop
+    }
 
     var messageID: UInt16 = 0
 
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         messageID = messageID &+ 1
         let header = MessageHeader(id: messageID, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-        let question = QuestionSection(labels: ["google", "com"], type: .a, questionClass: .internet)
+        let labels = host.split(separator: ".").map(String.init).map(QuestionLabel.init)
+        let question = QuestionSection(labels: labels, type: .a, questionClass: .internet)
         let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
 
         let promise: EventLoopPromise<Message> = loop.newPromise()
