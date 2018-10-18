@@ -2,6 +2,7 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/.build/checkouts/cResolv.git-6401867970940183064" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/.build/checkouts/swift-nio-zlib-support.git--8198041541215837471" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/.build/checkouts/swift-nio.git--150986978493667037" vcs="Git" />
   </component>
