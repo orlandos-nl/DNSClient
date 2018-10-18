@@ -1,7 +1,7 @@
 import NIO
 
 let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-let dnsClient = try NioDNS.connect(on: group, host: "172.16.0.16").wait()
+let dnsClient = try NioDNS.connect(on: group).wait()
 print("Connected")
 
 func query() -> Message {
@@ -21,7 +21,7 @@ func status() -> Message {
     return Message(header: header, questions: [])
 }
 
-    dnsClient.sendMessage(query())
+dnsClient.sendMessage(query())
 sleep(10)
 
 //labels          63 octets or less

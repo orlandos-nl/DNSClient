@@ -1,51 +1,76 @@
 import NIO
+import CResolvHelpers
+import Darwin
+
+let initialized: Bool = {
+    initializeDNS()
+    return true
+}()
 
 class NioDNS {
-
     deinit {
         _ = channel.close(mode: .all)
     }
 
     let channel: Channel
-    let host: String
-
-    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
+    let host: SocketAddress
+    
+    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
+        guard initialized else {
+            fatalError("Invalid state")
+        }
+        
+        let address = getHost()
+        
+        let bits = UInt32(UInt8.max)
+        let n0 = UInt8(address.sin_addr.s_addr & bits)
+        let n1 = UInt8(address.sin_addr.s_addr >> 8 & bits)
+        let n2 = UInt8(address.sin_addr.s_addr >> 16 & bits)
+        let n3 = UInt8(address.sin_addr.s_addr >> 24 & bits)
+        
+        let host = SocketAddress(address, host: "\(n0).\(n1).\(n2).\(n3)")
+        
         let bootstrap = DatagramBootstrap(group: group)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
-                return NioDNS.initialize(pipeline: channel.pipeline, hostname: host)
-            }
-
+                return NioDNS.initialize(pipeline: channel.pipeline)
+        }
+        
         return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
             return NioDNS(channel: channel, host: host)
         }
     }
 
-    init(channel: Channel, host: String) {
+    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
+        do {
+            let address = try SocketAddress(ipAddress: host, port: 53)
+            
+            let bootstrap = DatagramBootstrap(group: group)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+                .channelInitializer { channel in
+                    return NioDNS.initialize(pipeline: channel.pipeline)
+                }
+
+            return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
+                return NioDNS(channel: channel, host: address)
+            }
+        } catch {
+            return group.next().newFailedFuture(error: error)
+        }
+    }
+
+    init(channel: Channel, host: SocketAddress) {
         self.channel = channel
         self.host = host
     }
     
     func sendMessage(_ message: Message) {
-        try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: host, port: 53), data: message), promise: nil)
+        channel.writeAndFlush(AddressedEnvelope(remoteAddress: host, data: message), promise: nil)
     }
 
-    static func initialize(pipeline: ChannelPipeline, hostname: String) -> EventLoopFuture<Void> {
-        /*var handlers: [ChannelHandler] = []
-        func addNext() {
-            guard handlers.count > 0 else {
-                promise.succeed(result: ())
-                return
-            }
-
-            let handler = handlers.removeFirst()
-
-            pipeline.add(handler: handler).whenSuccess {
-                addNext()
-            }
-        }
-        addNext()*/
+    static func initialize(pipeline: ChannelPipeline) -> EventLoopFuture<Void> {
         return pipeline.add(handler: DNSDecoder()).then {
             pipeline.add(handler: DNSEncoder())
         }
