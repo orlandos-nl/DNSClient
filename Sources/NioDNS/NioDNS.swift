@@ -38,7 +38,33 @@ class NioDNS: Resolver {
     }
 
     public func initiateAAAAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
-        return loop.newFailedFuture(error: ProtocolError())
+        messageID = messageID &+ 1
+        let header = MessageHeader(id: messageID, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+        let labels = host.split(separator: ".").map(String.init).map(QuestionLabel.init)
+        let question = QuestionSection(labels: labels, type: .aaaa, questionClass: .internet)
+        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+
+        let promise: EventLoopPromise<Message> = loop.newPromise()
+        dnsDecoder.messageCache[messageID] = promise
+        self.sendMessage(message)
+
+        return promise.futureResult.map { message in
+            return message.answers.compactMap { answer in
+                 guard answer.resourceDataLength == 16 else {
+                     return nil
+                 }
+
+                let ipAddress = answer.resourceData.data.withUnsafeBytes { buffer in
+                    // sin6_addr.in6_addr type needs to be in6_addr.__Unnamed_union___in6_u
+                    return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_u.self).baseAddress!.pointee
+                }
+
+                let scopeID: UInt32 = 0
+                let flowinfo: UInt32 = 0
+                let sockaddr = sockaddr_in6(sin6_family: sa_family_t(AF_INET6), sin6_port: in_port_t(port), sin6_flowinfo: flowinfo, sin6_addr: in6_addr(__in6_u: ipAddress), sin6_scope_id: scopeID)
+                return SocketAddress(sockaddr, host: host)
+            }
+        }
     }
 
     public func cancelQueries() {

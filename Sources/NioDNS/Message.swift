@@ -104,6 +104,7 @@ enum ResourceType: UInt16 {
     case mInfo
     case mx
     case txt
+    case aaaa = 28
     case srv = 33
 
     // QuestionType exclusive
