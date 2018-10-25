@@ -1,27 +1,18 @@
 import NIO
 
 class NioDNS: Resolver {
+    fileprivate let dnsDecoder: DNSDecoder
     let channel: Channel
     let host: String
-    let dnsDecoder: DNSDecoder
     var loop: EventLoop {
         return channel.eventLoop
     }
-
     var messageID: UInt16 = 0
 
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
-        messageID = messageID &+ 1
-        let header = MessageHeader(id: messageID, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-        let labels = host.split(separator: ".").map(String.init).map(QuestionLabel.init)
-        let question = QuestionSection(labels: labels, type: .a, questionClass: .internet)
-        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+        let result = self.sendMessage(to: host, type: .a)
 
-        let promise: EventLoopPromise<Message> = loop.newPromise()
-        dnsDecoder.messageCache[messageID] = promise
-        self.sendMessage(message)
-
-        return promise.futureResult.map { message in
+        return result.map { message in
             return message.answers.compactMap { answer in
                 guard answer.resourceDataLength == 4 else {
                     return nil
@@ -38,17 +29,9 @@ class NioDNS: Resolver {
     }
 
     public func initiateAAAAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
-        messageID = messageID &+ 1
-        let header = MessageHeader(id: messageID, options: [.standardQuery, .recursionDesired], questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-        let labels = host.split(separator: ".").map(String.init).map(QuestionLabel.init)
-        let question = QuestionSection(labels: labels, type: .aaaa, questionClass: .internet)
-        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+        let result = self.sendMessage(to: host, type: .aaaa)
 
-        let promise: EventLoopPromise<Message> = loop.newPromise()
-        dnsDecoder.messageCache[messageID] = promise
-        self.sendMessage(message)
-
-        return promise.futureResult.map { message in
+        return result.map { message in
             return message.answers.compactMap { answer in
                  guard answer.resourceDataLength == 16 else {
                      return nil
@@ -59,8 +42,8 @@ class NioDNS: Resolver {
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_u.self).baseAddress!.pointee
                 }
 
-                let scopeID: UInt32 = 0
-                let flowinfo: UInt32 = 0
+                let scopeID: UInt32 = 0 // More info about scope_id/zone_id https://tools.ietf.org/html/rfc6874#page-3
+                let flowinfo: UInt32 = 0 // More info about flowinfo https://tools.ietf.org/html/rfc6437#page-4
                 let sockaddr = sockaddr_in6(sin6_family: sa_family_t(AF_INET6), sin6_port: in_port_t(port), sin6_flowinfo: flowinfo, sin6_addr: in6_addr(__in6_u: ipAddress), sin6_scope_id: scopeID)
                 return SocketAddress(sockaddr, host: host)
             }
@@ -95,14 +78,64 @@ class NioDNS: Resolver {
         _ = channel.close(mode: .all)
     }
 
-    init(channel: Channel, host: String, decoder: DNSDecoder) {
+    fileprivate init(channel: Channel, host: String, decoder: DNSDecoder) {
         self.channel = channel
         self.host = host
         self.dnsDecoder = decoder
     }
-    
-    func sendMessage(_ message: Message) {
+
+    /**
+    Send a question to the host
+
+    - returns:
+    A future with the response message
+
+    - parameters:
+        - address: The hostname to send the question to
+        - type: The resource type you want to get
+        - additionalOptions: Additional message options
+    */
+    func sendMessage(to address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
+        messageID = messageID &+ 1
+
+        var options: MessageOptions = [.standardQuery, .recursionDesired]
+        if let additionalOptions = additionalOptions {
+            options.insert(additionalOptions)
+        }
+
+        let header = MessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+        let labels = address.split(separator: ".").map(String.init).map(QuestionLabel.init)
+        let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
+        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+
+        let promise: EventLoopPromise<Message> = loop.newPromise()
+        dnsDecoder.messageCache[messageID] = promise
+
         try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: host, port: 53), data: message), promise: nil)
+
+        return promise.futureResult
+    }
+
+    /**
+    Request SRV records from a host
+
+    - returns:
+    A future with the message response
+
+    - parameters:
+        - host: Hostname to get the records from
+    */
+    func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
+        let message = self.sendMessage(to: host, type: .srv)
+        return message.map { message in
+            return message.answers.compactMap { answer in
+                guard answer.dataType == ResourceType.srv else {
+                    return nil
+                }
+
+                return answer
+            }
+        }
     }
 }
 
@@ -234,7 +267,7 @@ extension ByteBuffer {
     }
 }
 
-final class DNSEncoder: ChannelOutboundHandler {
+private final class DNSEncoder: ChannelOutboundHandler {
     typealias OutboundIn = AddressedEnvelope<Message>
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
 
@@ -262,7 +295,7 @@ final class DNSEncoder: ChannelOutboundHandler {
     }
 }
 
-final class DNSDecoder: ChannelInboundHandler {
+private final class DNSDecoder: ChannelInboundHandler {
     var messageCache = [UInt16: EventLoopPromise<Message>]()
 
     public typealias InboundIn = AddressedEnvelope<ByteBuffer>
@@ -302,17 +335,14 @@ final class DNSDecoder: ChannelInboundHandler {
             return records
         }
 
-        messageCache[header.id]?.succeed(result: Message(
+        let message = Message(
                 header: header,
                 questions: questions,
                 answers: resourceRecords(count: header.answerCount),
                 authorities: resourceRecords(count: header.authorityCount),
                 additionalData: resourceRecords(count: header.additionalRecordCount)
-        ))
-        /*print(header)
-        print(questions)
-        print(resourceRecords(count: header.answerCount))
-        print(resourceRecords(count: header.authorityCount))
-        print(resourceRecords(count: header.additionalRecordCount))*/
+        )
+        messageCache[header.id]?.succeed(result: message)
+        // print(message)
     }
 }
