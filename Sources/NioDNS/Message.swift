@@ -32,6 +32,10 @@ struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
     var isAnswer: Bool {
         return self.contains(.answer)
     }
+
+    var isAuthorativeAnswer: Bool {
+        return self.contains(.authorativeAnswer)
+    }
     
     var isQuestion: Bool {
         return !isAnswer
@@ -53,9 +57,6 @@ struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
 //    multiple owner names because of aliases.
 //    The AA bit corresponds to the name which matches the query name, or
 //    the first owner name in the answer section.
-//    var isAuthorativeAnswer: Bool {
-//        return isAnswer &&
-//    }
 }
 
 struct MessageHeader {

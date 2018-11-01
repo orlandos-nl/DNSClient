@@ -5,8 +5,8 @@ let dnsClient = try NioDNS.connect(on: group, host: "8.8.8.8").wait()
 // 172.16.0.16
 print("Connected")
 
-//let message = try dnsClient.sendMessage(to: "google.com", type: .a).wait()
-//print(message)
+//let result = try dnsClient.sendMessage(to: "google.com", type: .aaaa).wait()
+//print(result)
 
 //let results = try dnsClient.initiateAQuery(host: "google.com", port: 80).wait()
 //for result in results {

@@ -84,17 +84,13 @@ class NioDNS: Resolver {
         self.dnsDecoder = decoder
     }
 
-    /**
-    Send a question to the host
-
-    - returns:
-    A future with the response message
-
-    - parameters:
-        - address: The hostname to send the question to
-        - type: The resource type you want to get
-        - additionalOptions: Additional message options
-    */
+    /// Send a question to the host
+    ///
+    /// - parameters:
+    ///     - address: The hostname to send the question to
+    ///     - type: The resource type you want to get
+    ///     - additionalOptions: Additional message options
+    /// - returns: A future with the response message
     func sendMessage(to address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
         messageID = messageID &+ 1
 
@@ -116,15 +112,11 @@ class NioDNS: Resolver {
         return promise.futureResult
     }
 
-    /**
-    Request SRV records from a host
-
-    - returns:
-    A future with the message response
-
-    - parameters:
-        - host: Hostname to get the records from
-    */
+    /// Request SRV records from a host
+    ///
+    /// - parameters:
+    ///     - host: Hostname to get the records from
+    /// - returns: A future with the message response
     func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
         let message = self.sendMessage(to: host, type: .srv)
         return message.map { message in
