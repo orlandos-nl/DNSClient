@@ -1,14 +1,14 @@
 fileprivate let opCodeBits: UInt16 = 0b01111000_00000000
 fileprivate let resuleCodeBits: UInt16 = 0b00000000_00001111
 
-struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
-    var rawValue: UInt16
-    
-    init(rawValue: UInt16) {
+public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
+    public var rawValue: UInt16
+
+    public init(rawValue: UInt16) {
         self.rawValue = rawValue
     }
-    
-    init(integerLiteral value: UInt16) {
+
+    public init(integerLiteral value: UInt16) {
         self.rawValue = value
     }
     
@@ -59,7 +59,7 @@ struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
 //    the first owner name in the answer section.
 }
 
-struct MessageHeader {
+public struct MessageHeader {
     let id: UInt16
     
     let options: MessageOptions
@@ -70,17 +70,17 @@ struct MessageHeader {
     let additionalRecordCount: UInt16
 }
 
-struct QuestionLabel: ExpressibleByStringLiteral {
+public struct QuestionLabel: ExpressibleByStringLiteral {
     let length: UInt8
     
     // Max UInt8.max in length
     let label: [UInt8]
-    
-    init(stringLiteral string: String) {
+
+    public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
     }
-    
-    init(bytes: [UInt8]) {
+
+    public init(bytes: [UInt8]) {
         assert(bytes.count < 64)
         
         self.label = bytes
@@ -88,7 +88,7 @@ struct QuestionLabel: ExpressibleByStringLiteral {
     }
 }
 
-enum ResourceType: UInt16 {
+public enum ResourceType: UInt16 {
     case a = 1
     case ns
     case md
@@ -117,24 +117,24 @@ enum ResourceType: UInt16 {
 
 typealias QuestionType = ResourceType
 
-enum DataClass: UInt16 {
+public enum DataClass: UInt16 {
     case internet = 1
     case chaos = 3
     case hesoid = 4
 }
 
-struct QuestionSection {
+public struct QuestionSection {
     let labels: [QuestionLabel]
     let type: QuestionType
     let questionClass: DataClass
 }
 
 // E.G. IPv4, IPv6, ...
-struct ResourceData {
+public struct ResourceData {
     var data: [UInt8]
 }
 
-struct ResourceRecord {
+public struct ResourceRecord {
     let domainName: [QuestionLabel]
     let dataType: ResourceType
     let dataClass: DataClass
@@ -145,7 +145,7 @@ struct ResourceRecord {
 
 // TODO: https://tools.ietf.org/html/rfc1035 section 4.1.4 compression
 
-struct Message {
+public struct Message {
     let header: MessageHeader
     let questions: [QuestionSection]
     let answers: [ResourceRecord]

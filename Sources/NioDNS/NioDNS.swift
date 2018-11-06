@@ -1,6 +1,6 @@
 import NIO
 
-class NioDNS: Resolver {
+public class NioDNS: Resolver {
     fileprivate let dnsDecoder: DNSDecoder
     let channel: Channel
     let host: String
@@ -91,7 +91,7 @@ class NioDNS: Resolver {
     ///     - type: The resource type you want to get
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
-    func sendMessage(to address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
+    public func sendMessage(to address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
         messageID = messageID &+ 1
 
         var options: MessageOptions = [.standardQuery, .recursionDesired]
@@ -117,7 +117,7 @@ class NioDNS: Resolver {
     /// - parameters:
     ///     - host: Hostname to get the records from
     /// - returns: A future with the message response
-    func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
+    public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
         let message = self.sendMessage(to: host, type: .srv)
         return message.map { message in
             return message.answers.compactMap { answer in

@@ -1,5 +1,4 @@
 import XCTest
-
 import NioDNSTests
 
 var tests = [XCTestCaseEntry]()

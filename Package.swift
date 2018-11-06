@@ -26,6 +26,6 @@ let package = Package(
         .target(name: "CResolvHelpers"),
         .testTarget(
             name: "NioDNSTests",
-            dependencies: ["NioDNS"]),
+            dependencies: ["NIO", "NioDNS"]),
     ]
 )
