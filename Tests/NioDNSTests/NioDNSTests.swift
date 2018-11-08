@@ -1,6 +1,6 @@
 import XCTest
 import NIO
-@testable import NioDNS
+import NioDNS
 
 final class NioDNSTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
@@ -16,8 +16,8 @@ final class NioDNSTests: XCTestCase {
         }
     }
 
-    func testSendMessage() throws {
-        let result = try dnsClient.sendMessage(to: "google.com", type: .aaaa).wait()
+    func testSendQuery() throws {
+        let result = try dnsClient.sendQuery(forHost: "google.com", type: .aaaa).wait()
         XCTAssertGreaterThan(result.answers.count, 0, "There should atleast be 1 answer")
     }
 
@@ -27,7 +27,7 @@ final class NioDNSTests: XCTestCase {
     }
 
     static var allTests = [
-        ("testSendMessage", testSendMessage),
+        ("testSendQuery", testSendMessage),
         ("testSRVRecords", testSRVRecords),
     ]
 }

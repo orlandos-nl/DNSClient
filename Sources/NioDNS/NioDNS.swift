@@ -10,7 +10,7 @@ public class NioDNS: Resolver {
     var messageID: UInt16 = 0
 
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
-        let result = self.sendMessage(to: host, type: .a)
+        let result = self.sendQuery(forHost: host, type: .a)
 
         return result.map { message in
             return message.answers.compactMap { answer in
@@ -29,7 +29,7 @@ public class NioDNS: Resolver {
     }
 
     public func initiateAAAAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
-        let result = self.sendMessage(to: host, type: .aaaa)
+        let result = self.sendQuery(forHost: host, type: .aaaa)
 
         return result.map { message in
             return message.answers.compactMap { answer in
@@ -91,7 +91,7 @@ public class NioDNS: Resolver {
     ///     - type: The resource type you want to get
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
-    public func sendMessage(to address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
+    public func sendQuery(forHost address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
         messageID = messageID &+ 1
 
         var options: MessageOptions = [.standardQuery, .recursionDesired]
@@ -118,7 +118,7 @@ public class NioDNS: Resolver {
     ///     - host: Hostname to get the records from
     /// - returns: A future with the message response
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
-        let message = self.sendMessage(to: host, type: .srv)
+        let message = self.sendQuery(forHost: host, type: .srv)
         return message.map { message in
             return message.answers.compactMap { answer in
                 guard answer.dataType == ResourceType.srv else {

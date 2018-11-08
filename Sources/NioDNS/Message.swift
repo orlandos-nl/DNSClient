@@ -11,45 +11,45 @@ public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
     public init(integerLiteral value: UInt16) {
         self.rawValue = value
     }
-    
-    static let answer: MessageOptions = 0b10000000_00000000
-    static let authorativeAnswer: MessageOptions = 0b00000100_00000000
-    static let truncated: MessageOptions = 0b00000010_00000000
-    static let recursionDesired: MessageOptions = 0b00000001_00000000
-    static let recursionAvailable: MessageOptions = 0b00000000_10000000
-    
-    static let standardQuery: MessageOptions = 0b00000000_00000000
-    static let inverseQuery: MessageOptions = 0b00001000_00000000
-    static let serverStatusQuery: MessageOptions = 0b00010000_00000000
-    
-    static let resultCodeSuccess: MessageOptions = 0b00000000_00000000
-    static let resultCodeFormatError: MessageOptions = 0b00000000_00000001
-    static let resultCodeServerfailure: MessageOptions = 0b00000000_00000010
-    static let resultCodeNameError: MessageOptions = 0b00000000_00000011
-    static let resultCodeNotImplemented: MessageOptions = 0b00000000_00000100
-    static let resultCodeNotRefused: MessageOptions = 0b00000000_00000101
-    
-    var isAnswer: Bool {
+
+    public static let answer: MessageOptions = 0b10000000_00000000
+    public static let authorativeAnswer: MessageOptions = 0b00000100_00000000
+    public static let truncated: MessageOptions = 0b00000010_00000000
+    public static let recursionDesired: MessageOptions = 0b00000001_00000000
+    public static let recursionAvailable: MessageOptions = 0b00000000_10000000
+
+    public static let standardQuery: MessageOptions = 0b00000000_00000000
+    public static let inverseQuery: MessageOptions = 0b00001000_00000000
+    public static let serverStatusQuery: MessageOptions = 0b00010000_00000000
+
+    public static let resultCodeSuccess: MessageOptions = 0b00000000_00000000
+    public static let resultCodeFormatError: MessageOptions = 0b00000000_00000001
+    public static let resultCodeServerfailure: MessageOptions = 0b00000000_00000010
+    public static let resultCodeNameError: MessageOptions = 0b00000000_00000011
+    public static let resultCodeNotImplemented: MessageOptions = 0b00000000_00000100
+    public static let resultCodeNotRefused: MessageOptions = 0b00000000_00000101
+
+    public var isAnswer: Bool {
         return self.contains(.answer)
     }
 
-    var isAuthorativeAnswer: Bool {
+    public var isAuthorativeAnswer: Bool {
         return self.contains(.authorativeAnswer)
     }
-    
-    var isQuestion: Bool {
+
+    public var isQuestion: Bool {
         return !isAnswer
     }
-    
-    var isStandardQuery: Bool {
+
+    public var isStandardQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.standardQuery.rawValue
     }
-    
-    var isInverseQuery: Bool {
+
+    public var isInverseQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.inverseQuery.rawValue
     }
-    
-    var isServerStatusQuery: Bool {
+
+    public var isServerStatusQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.serverStatusQuery.rawValue
     }
     
@@ -60,21 +60,21 @@ public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
 }
 
 public struct MessageHeader {
-    let id: UInt16
-    
-    let options: MessageOptions
-    
-    let questionCount: UInt16
-    let answerCount: UInt16
-    let authorityCount: UInt16
-    let additionalRecordCount: UInt16
+    public let id: UInt16
+
+    public let options: MessageOptions
+
+    public let questionCount: UInt16
+    public let answerCount: UInt16
+    public let authorityCount: UInt16
+    public let additionalRecordCount: UInt16
 }
 
 public struct QuestionLabel: ExpressibleByStringLiteral {
-    let length: UInt8
+    public let length: UInt8
     
     // Max UInt8.max in length
-    let label: [UInt8]
+    public let label: [UInt8]
 
     public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
@@ -115,7 +115,7 @@ public enum ResourceType: UInt16 {
     case any = 255
 }
 
-typealias QuestionType = ResourceType
+public typealias QuestionType = ResourceType
 
 public enum DataClass: UInt16 {
     case internet = 1
@@ -124,31 +124,31 @@ public enum DataClass: UInt16 {
 }
 
 public struct QuestionSection {
-    let labels: [QuestionLabel]
-    let type: QuestionType
-    let questionClass: DataClass
+    public let labels: [QuestionLabel]
+    public let type: QuestionType
+    public let questionClass: DataClass
 }
 
 // E.G. IPv4, IPv6, ...
 public struct ResourceData {
-    var data: [UInt8]
+    public var data: [UInt8]
 }
 
 public struct ResourceRecord {
-    let domainName: [QuestionLabel]
-    let dataType: ResourceType
-    let dataClass: DataClass
-    let ttl: UInt32
-    let resourceDataLength: UInt16
-    let resourceData: ResourceData
+    public let domainName: [QuestionLabel]
+    public let dataType: ResourceType
+    public let dataClass: DataClass
+    public let ttl: UInt32
+    public let resourceDataLength: UInt16
+    public let resourceData: ResourceData
 }
 
 // TODO: https://tools.ietf.org/html/rfc1035 section 4.1.4 compression
 
 public struct Message {
-    let header: MessageHeader
-    let questions: [QuestionSection]
-    let answers: [ResourceRecord]
-    let authorities: [ResourceRecord]
-    let additionalData: [ResourceRecord]
+    public let header: MessageHeader
+    public let questions: [QuestionSection]
+    public let answers: [ResourceRecord]
+    public let authorities: [ResourceRecord]
+    public let additionalData: [ResourceRecord]
 }
