@@ -7,8 +7,15 @@ public class NioDNS: Resolver {
     var loop: EventLoop {
         return channel.eventLoop
     }
+    // Each query has an ID to keep track of which response belongs to which query
     var messageID: UInt16 = 0
 
+    /// Request A records
+    ///
+    /// - parameters:
+    ///     - host: The hostname address to request the records from
+    ///     - port: The port to use
+    /// - returns: A future of SocketAddresses
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         let result = self.sendQuery(forHost: host, type: .a)
 
@@ -28,6 +35,12 @@ public class NioDNS: Resolver {
         }
     }
 
+    /// Request AAAA records
+    ///
+    /// - parameters:
+    ///     - host: The hostname address to request the records from
+    ///     - port: The port to use
+    /// - returns: A future of SocketAddresses
     public func initiateAAAAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         let result = self.sendQuery(forHost: host, type: .aaaa)
 
@@ -38,7 +51,7 @@ public class NioDNS: Resolver {
                  }
 
                 let ipAddress = answer.resourceData.data.withUnsafeBytes { buffer in
-                    // sin6_addr.in6_addr type needs to be in6_addr.__Unnamed_union___in6_u
+                    // sin6_addr.in6_addr needs to be of type in6_addr.__Unnamed_union___in6_u
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_u.self).baseAddress!.pointee
                 }
 
@@ -50,6 +63,7 @@ public class NioDNS: Resolver {
         }
     }
 
+    /// Cancel all queries
     public func cancelQueries() {
         for (id, promise) in dnsDecoder.messageCache {
             dnsDecoder.messageCache[id] = nil
@@ -57,6 +71,12 @@ public class NioDNS: Resolver {
         }
     }
 
+    /// Connect to the dns server
+    ///
+    /// - parameters:
+    ///     - group: EventLoops to use
+    ///     - host: DNS host to connect to
+    /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
         let dnsDecoder = DNSDecoder()
 
@@ -84,11 +104,11 @@ public class NioDNS: Resolver {
         self.dnsDecoder = decoder
     }
 
-    /// Send a question to the host
+    /// Send a question to the dns host
     ///
     /// - parameters:
-    ///     - address: The hostname to send the question to
-    ///     - type: The resource type you want to get
+    ///     - address: The hostname address to request a certain resource from
+    ///     - type: The resource you want to request
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
     public func sendQuery(forHost address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
@@ -116,7 +136,7 @@ public class NioDNS: Resolver {
     ///
     /// - parameters:
     ///     - host: Hostname to get the records from
-    /// - returns: A future with the message response
+    /// - returns: A future with the resource record
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
         let message = self.sendQuery(forHost: host, type: .srv)
         return message.map { message in
@@ -335,6 +355,5 @@ private final class DNSDecoder: ChannelInboundHandler {
                 additionalData: resourceRecords(count: header.additionalRecordCount)
         )
         messageCache[header.id]?.succeed(result: message)
-        // print(message)
     }
 }

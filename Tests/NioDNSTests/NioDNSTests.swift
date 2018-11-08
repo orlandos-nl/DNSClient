@@ -16,6 +16,16 @@ final class NioDNSTests: XCTestCase {
         }
     }
 
+    func testAQuery() throws {
+        let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
+        XCTAssertGreaterThan(results.count, 0, "There should atleast be 1 answer")
+    }
+
+    func testAAAAQuery() throws {
+        let results = try dnsClient.initiateAAAAQuery(host: "google.com", port: 443).wait()
+        XCTAssertGreaterThan(results.count, 0, "There should atleast be 1 answer")
+    }
+
     func testSendQuery() throws {
         let result = try dnsClient.sendQuery(forHost: "google.com", type: .aaaa).wait()
         XCTAssertGreaterThan(result.answers.count, 0, "There should atleast be 1 answer")
@@ -27,6 +37,8 @@ final class NioDNSTests: XCTestCase {
     }
 
     static var allTests = [
+        ("testAQuery", testAQuery),
+        ("testAAAAQuery", testAAAAQuery),
         ("testSendQuery", testSendQuery),
         ("testSRVRecords", testSRVRecords),
     ]
