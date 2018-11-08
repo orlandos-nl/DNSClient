@@ -27,8 +27,8 @@ final class NioDNSTests: XCTestCase {
     }
 
     func testSendQuery() throws {
-        let result = try dnsClient.sendQuery(forHost: "google.com", type: .aaaa).wait()
-        XCTAssertGreaterThanOrEqual(result.answers.count, 1, "The returned answers should be greater than or equal to 1")
+        let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
+        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
     }
 
     func testSRVRecords() throws {

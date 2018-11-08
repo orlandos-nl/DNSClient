@@ -3,7 +3,7 @@ import NIO
 public class NioDNS: Resolver {
     fileprivate let dnsDecoder: DNSDecoder
     let channel: Channel
-    let host: String
+    let dnsHost: String
     var loop: EventLoop {
         return channel.eventLoop
     }
@@ -100,7 +100,7 @@ public class NioDNS: Resolver {
 
     fileprivate init(channel: Channel, host: String, decoder: DNSDecoder) {
         self.channel = channel
-        self.host = host
+        self.dnsHost = host
         self.dnsDecoder = decoder
     }
 
@@ -127,7 +127,7 @@ public class NioDNS: Resolver {
         let promise: EventLoopPromise<Message> = loop.newPromise()
         dnsDecoder.messageCache[messageID] = promise
 
-        try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: host, port: 53), data: message), promise: nil)
+        try! channel.writeAndFlush(AddressedEnvelope(remoteAddress: SocketAddress(ipAddress: dnsHost, port: 53), data: message), promise: nil)
 
         return promise.futureResult
     }
@@ -140,6 +140,8 @@ public class NioDNS: Resolver {
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
         let message = self.sendQuery(forHost: host, type: .srv)
         return message.map { message in
+            // print(message.header.options.isSuccessful)
+            // print(message)
             return message.answers.compactMap { answer in
                 guard answer.dataType == ResourceType.srv else {
                     return nil

@@ -52,6 +52,10 @@ public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
     public var isServerStatusQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.serverStatusQuery.rawValue
     }
+
+    public var isSuccessful: Bool {
+        return self.contains(.resultCodeSuccess)
+    }
     
 //    Note that the contents of the answer section may have
 //    multiple owner names because of aliases.
