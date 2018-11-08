@@ -27,7 +27,7 @@ final class NioDNSTests: XCTestCase {
     }
 
     static var allTests = [
-        ("testSendQuery", testSendMessage),
+        ("testSendQuery", testSendQuery),
         ("testSRVRecords", testSRVRecords),
     ]
 }
