@@ -18,22 +18,22 @@ final class NioDNSTests: XCTestCase {
 
     func testAQuery() throws {
         let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
-        XCTAssertGreaterThan(results.count, 0, "There should atleast be 1 answer")
+        XCTAssertGreaterThan(results.count, 0, "The returned result should be greater than 0")
     }
 
     func testAAAAQuery() throws {
         let results = try dnsClient.initiateAAAAQuery(host: "google.com", port: 443).wait()
-        XCTAssertGreaterThan(results.count, 0, "There should atleast be 1 answer")
+        XCTAssertGreaterThan(results.count, 0, "The returned result should be greater than 0")
     }
 
     func testSendQuery() throws {
         let result = try dnsClient.sendQuery(forHost: "google.com", type: .aaaa).wait()
-        XCTAssertGreaterThan(result.answers.count, 0, "There should atleast be 1 answer")
+        XCTAssertGreaterThan(result.answers.count, 0, "The returned answers should be greater than 0")
     }
 
     func testSRVRecords() throws {
         let answers = try dnsClient.getSRVRecords(from: "ok0-xkvc1.mongodb.net").wait()
-        XCTAssertGreaterThan(answers.count, 0, "There should atleast be 1 answer")
+        XCTAssertGreaterThan(answers.count, 0, "The returned answers should be greater than 0")
     }
 
     static var allTests = [
