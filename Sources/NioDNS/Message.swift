@@ -1,5 +1,5 @@
 fileprivate let opCodeBits: UInt16 = 0b01111000_00000000
-fileprivate let resuleCodeBits: UInt16 = 0b00000000_00001111
+fileprivate let resultCodeBits: UInt16 = 0b00000000_00001111
 
 public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
     public var rawValue: UInt16
@@ -55,6 +55,30 @@ public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
 
     public var isSuccessful: Bool {
         return self.contains(.resultCodeSuccess)
+    }
+
+    public var isFormatError: Bool {
+        return self.contains(.resultCodeFormatError)
+    }
+
+    public var isServerFailure: Bool {
+        return self.contains(.resultCodeServerfailure)
+    }
+
+    public var isNameError: Bool {
+        return self.contains(.resultCodeNameError)
+    }
+
+    public var isNotImplemented: Bool {
+        return self.contains(.resultCodeNotImplemented)
+    }
+
+    public var isNotRefused: Bool {
+        return self.contains(.resultCodeNotRefused)
+    }
+
+    public var isRefused: Bool {
+        return !isNotRefused
     }
     
 //    Note that the contents of the answer section may have

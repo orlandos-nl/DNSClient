@@ -140,8 +140,9 @@ public class NioDNS: Resolver {
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
         let message = self.sendQuery(forHost: host, type: .srv)
         return message.map { message in
-            // print(message.header.options.isSuccessful)
-            // print(message)
+//            print("Successful: \(message.header.options.isSuccessful)")
+//            print("Refused: \(message.header.options.isRefused)")
+//            print(message)
             return message.answers.compactMap { answer in
                 guard answer.dataType == ResourceType.srv else {
                     return nil
