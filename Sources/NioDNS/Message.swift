@@ -1,113 +1,116 @@
+import NIO
+import Foundation
+
 fileprivate let opCodeBits: UInt16 = 0b01111000_00000000
 fileprivate let resultCodeBits: UInt16 = 0b00000000_00001111
 
 public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
     public var rawValue: UInt16
-
+    
     public init(rawValue: UInt16) {
         self.rawValue = rawValue
     }
-
+    
     public init(integerLiteral value: UInt16) {
         self.rawValue = value
     }
-
+    
     public static let answer: MessageOptions = 0b10000000_00000000
     public static let authorativeAnswer: MessageOptions = 0b00000100_00000000
     public static let truncated: MessageOptions = 0b00000010_00000000
     public static let recursionDesired: MessageOptions = 0b00000001_00000000
     public static let recursionAvailable: MessageOptions = 0b00000000_10000000
-
+    
     public static let standardQuery: MessageOptions = 0b00000000_00000000
     public static let inverseQuery: MessageOptions = 0b00001000_00000000
     public static let serverStatusQuery: MessageOptions = 0b00010000_00000000
-
+    
     public static let resultCodeSuccess: MessageOptions = 0b00000000_00000000
     public static let resultCodeFormatError: MessageOptions = 0b00000000_00000001
     public static let resultCodeServerfailure: MessageOptions = 0b00000000_00000010
     public static let resultCodeNameError: MessageOptions = 0b00000000_00000011
     public static let resultCodeNotImplemented: MessageOptions = 0b00000000_00000100
     public static let resultCodeNotRefused: MessageOptions = 0b00000000_00000101
-
+    
     public var isAnswer: Bool {
         return self.contains(.answer)
     }
-
+    
     public var isAuthorativeAnswer: Bool {
         return self.contains(.authorativeAnswer)
     }
-
+    
     public var isQuestion: Bool {
         return !isAnswer
     }
-
+    
     public var isStandardQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.standardQuery.rawValue
     }
-
+    
     public var isInverseQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.inverseQuery.rawValue
     }
-
+    
     public var isServerStatusQuery: Bool {
         return rawValue & opCodeBits == MessageOptions.serverStatusQuery.rawValue
     }
-
+    
     public var isSuccessful: Bool {
         return self.contains(.resultCodeSuccess)
     }
-
+    
     public var isFormatError: Bool {
         return self.contains(.resultCodeFormatError)
     }
-
+    
     public var isServerFailure: Bool {
         return self.contains(.resultCodeServerfailure)
     }
-
+    
     public var isNameError: Bool {
         return self.contains(.resultCodeNameError)
     }
-
+    
     public var isNotImplemented: Bool {
         return self.contains(.resultCodeNotImplemented)
     }
-
+    
     public var isNotRefused: Bool {
         return self.contains(.resultCodeNotRefused)
     }
-
+    
     public var isRefused: Bool {
         return !isNotRefused
     }
     
-//    Note that the contents of the answer section may have
-//    multiple owner names because of aliases.
-//    The AA bit corresponds to the name which matches the query name, or
-//    the first owner name in the answer section.
+    //    Note that the contents of the answer section may have
+    //    multiple owner names because of aliases.
+    //    The AA bit corresponds to the name which matches the query name, or
+    //    the first owner name in the answer section.
 }
 
 public struct MessageHeader {
-    public let id: UInt16
-
+    public internal(set) var id: UInt16
+    
     public let options: MessageOptions
-
+    
     public let questionCount: UInt16
     public let answerCount: UInt16
     public let authorityCount: UInt16
     public let additionalRecordCount: UInt16
 }
 
-public struct QuestionLabel: ExpressibleByStringLiteral {
+public struct DNSLabel: ExpressibleByStringLiteral {
     public let length: UInt8
     
     // Max UInt8.max in length
     public let label: [UInt8]
-
+    
     public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
     }
-
+    
     public init(bytes: [UInt8]) {
         assert(bytes.count < 64)
         
@@ -135,7 +138,7 @@ public enum ResourceType: UInt16 {
     case txt
     case aaaa = 28
     case srv = 33
-
+    
     // QuestionType exclusive
     case axfr = 252
     case mailB = 253
@@ -152,29 +155,100 @@ public enum DataClass: UInt16 {
 }
 
 public struct QuestionSection {
-    public let labels: [QuestionLabel]
+    public let labels: [DNSLabel]
     public let type: QuestionType
     public let questionClass: DataClass
 }
 
-// E.G. IPv4, IPv6, ...
-public struct ResourceData {
-    public var data: [UInt8]
+public struct ResourceRecord {
+    public let domainName: [DNSLabel]
+    public let dataType: UInt16
+    public let dataClass: UInt16
+    public let ttl: UInt32
+    public let resourceData: ByteBuffer
+    public let resourceDataLength: Int
+    
+    func parseSOA() throws -> ZoneAuthority {
+        struct InvalidSOARecord: Error {}
+        var resourceData = self.resourceData
+        
+        guard
+            let domainName = resourceData.readLabels(),
+            resourceData.readableBytes >= 20, // Minimum 5 UInt32's
+            let serial: UInt32 = resourceData.readInteger(endianness: .big),
+            let refresh: UInt32 = resourceData.readInteger(endianness: .big),
+            let retry: UInt32 = resourceData.readInteger(endianness: .big),
+            let expire: UInt32 = resourceData.readInteger(endianness: .big),
+            let minimumExpire: UInt32 = resourceData.readInteger(endianness: .big)
+        else {
+            throw InvalidSOARecord()
+        }
+        
+        return ZoneAuthority(
+            domainName: domainName,
+            adminMail: "",
+            serial: serial,
+            refreshInterval: refresh,
+            retryTimeinterval: retry,
+            expireTimeout: expire,
+            minimumExpireTimeout: minimumExpire
+        )
+    }
+    
+    func parseA() throws -> UInt32 {
+        struct InvalidARecord: Error {}
+        guard
+            resourceData.readableBytes == 4,
+            let ipAddress = resourceData.getInteger(at: resourceData.readerIndex, endianness: .little, as: UInt32.self)
+            else {
+                throw InvalidARecord()
+        }
+        
+        return ipAddress
+    }
+    
+    func parseAddress4(port: Int) throws -> SocketAddress {
+        let ipAddress = try parseA()
+        
+        return try ipAddress.socketAddress(port: port)
+    }
 }
 
-public struct ResourceRecord {
-    public let domainName: [QuestionLabel]
-    public let dataType: ResourceType
-    public let dataClass: DataClass
-    public let ttl: UInt32
-    public let resourceDataLength: UInt16
-    public let resourceData: ResourceData
+extension UInt32 {
+    func socketAddress(port: Int) throws -> SocketAddress {
+        let text = inet_ntoa(in_addr(s_addr: self))!
+        let host = String(cString: text)
+        
+        return try SocketAddress(ipAddress: host, port: UInt16(port))
+    }
+}
+
+struct ZoneAuthority {
+    let domainName: [DNSLabel]
+    let adminMail: String
+    let serial: UInt32
+    let refreshInterval: UInt32
+    let retryTimeinterval: UInt32
+    let expireTimeout: UInt32
+    let minimumExpireTimeout: UInt32
+}
+
+extension Array where Element == DNSLabel {
+    public var string: String {
+        return self.compactMap { label in
+            if let string = String(bytes: label.label, encoding: .utf8), string.count > 0 {
+                return string
+            }
+            
+            return nil
+            }.joined(separator: ".")
+    }
 }
 
 // TODO: https://tools.ietf.org/html/rfc1035 section 4.1.4 compression
 
 public struct Message {
-    public let header: MessageHeader
+    public internal(set) var header: MessageHeader
     public let questions: [QuestionSection]
     public let answers: [ResourceRecord]
     public let authorities: [ResourceRecord]

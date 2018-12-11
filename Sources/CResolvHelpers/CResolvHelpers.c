@@ -2,7 +2,7 @@
 #include "CResolvHelpers.h"
 
 void initializeDNS() {
-    res_init();
+//    res_init();
 }
 
 struct sockaddr_in getHost() {

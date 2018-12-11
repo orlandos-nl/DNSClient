@@ -12,7 +12,7 @@ final class NioDNSTests: XCTestCase {
             group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
             dnsClient = try NioDNS.connect(on: group, host: "8.8.8.8").wait()
         } catch let error {
-            print(error)
+            XCTFail("\(error)")
         }
     }
 
@@ -32,7 +32,7 @@ final class NioDNSTests: XCTestCase {
     }
 
     func testSRVRecords() throws {
-        let answers = try dnsClient.getSRVRecords(from: "ok0-xkvc1.mongodb.net").wait()
+        let answers = try dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net").wait()
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
     }
 
