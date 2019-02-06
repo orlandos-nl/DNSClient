@@ -37,11 +37,14 @@ public final class NioDNS: Resolver {
         
         return result.map { message in
             return message.answers.compactMap { answer in
-                guard answer.resourceData.readableBytes == 16 else {
+                guard
+                    let resourceData = answer.resourceData,
+                    answer.resourceDataLength == 16
+                else {
                     return nil
                 }
                 
-                let ipAddress = answer.resourceData.withUnsafeReadableBytes { buffer in
+                let ipAddress = resourceData.withUnsafeReadableBytes { buffer in
                     // sin6_addr.in6_addr needs to be of type in6_addr.__Unnamed_union___in6_u
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___u6_addr.self).baseAddress!.pointee
                 }
@@ -90,7 +93,7 @@ public final class NioDNS: Resolver {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
                 return channel.pipeline.add(handler: dnsDecoder).then {
-                    channel.pipeline.add(handler: DNSEncoder())
+                    return channel.pipeline.add(handler: DNSEncoder())
                 }
         }
         
@@ -153,14 +156,14 @@ public final class NioDNS: Resolver {
     /// - parameters:
     ///     - host: Hostname to get the records from
     /// - returns: A future with the resource record
-    public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord]> {
-        return self.sendQuery(forHost: host, type: .srv).map { message in
-            return message.answers.compactMap { answer in
+    public func getSRVRecords(from host: String) -> EventLoopFuture<[SRVData]> {
+        return self.sendQuery(forHost: host, type: .srv).thenThrowing { message in
+            return try message.answers.compactMap { answer in
                 guard answer.dataType == ResourceType.srv.rawValue else {
                     return nil
                 }
                 
-                return answer
+                return try SRVData(record: answer)
             }
         }
     }
@@ -287,7 +290,7 @@ extension ByteBuffer {
             dataType: typeNumber,
             dataClass: classNumber,
             ttl: ttl,
-            resourceData: self,
+            resourceData: self.getSlice(at: readerIndex, length: Int(dataLength)),
             resourceDataLength: Int(dataLength)
         )
         
@@ -391,25 +394,8 @@ private final class DNSDecoder: ChannelInboundHandler {
                 throw UnknownQuery()
             }
             
-            if message.answers.count > 0 {
-                query.promise.succeed(result: message)
-                messageCache[header.id] = nil
-            } else if let authority = message.authorities.first, authority.dataType == ResourceType.soa.rawValue, header.answerCount == 0 {
-                let authority = try authority.parseSOA()
-                
-                mainClient.sendQuery(forHost: authority.domainName.string, type: .a).thenThrowing { message -> SocketAddress in
-                    guard let answer = message.answers.first else {
-                        throw AuthorityNotFound()
-                    }
-                    
-                    return try answer.parseAddress4(port: 53)
-                }.then { address in
-                    return mainClient.send(query.message, to: address)
-                }.cascade(promise: query.promise)
-            } else {
-                query.promise.succeed(result: message)
-                messageCache[header.id] = nil
-            }
+            query.promise.succeed(result: message)
+            messageCache[header.id] = nil
         } catch {
             messageCache[header.id]?.promise.fail(error: error)
             messageCache[header.id] = nil

@@ -165,14 +165,14 @@ public struct ResourceRecord {
     public let dataType: UInt16
     public let dataClass: UInt16
     public let ttl: UInt32
-    public let resourceData: ByteBuffer
+    public let resourceData: ByteBuffer?
     public let resourceDataLength: Int
     
     func parseSOA() throws -> ZoneAuthority {
         struct InvalidSOARecord: Error {}
-        var resourceData = self.resourceData
         
         guard
+            var resourceData = self.resourceData,
             let domainName = resourceData.readLabels(),
             resourceData.readableBytes >= 20, // Minimum 5 UInt32's
             let serial: UInt32 = resourceData.readInteger(endianness: .big),
@@ -198,6 +198,7 @@ public struct ResourceRecord {
     func parseA() throws -> UInt32 {
         struct InvalidARecord: Error {}
         guard
+            let resourceData = self.resourceData,
             resourceData.readableBytes == 4,
             let ipAddress = resourceData.getInteger(at: resourceData.readerIndex, endianness: .little, as: UInt32.self)
             else {
