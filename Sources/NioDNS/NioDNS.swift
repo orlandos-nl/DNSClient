@@ -1,4 +1,5 @@
 import NIO
+import CResolvHelpers
 
 public final class NioDNS: Resolver {
     fileprivate let dnsDecoder: DNSDecoder
