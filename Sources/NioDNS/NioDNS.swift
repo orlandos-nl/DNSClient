@@ -20,9 +20,13 @@ public final class NioDNS: Resolver {
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         let result = self.sendQuery(forHost: host, type: .a)
         
-        return result.map { message in
+        return result.thenThrowing { message in
             return message.answers.compactMap { answer in
-                return try? answer.parseAddress4(port: port)
+                guard case .a(let record) = answer else {
+                    return nil
+                }
+
+                return try? record.rawAddress.socketAddress(port: port)
             }
         }
     }
@@ -39,13 +43,14 @@ public final class NioDNS: Resolver {
         return result.map { message in
             return message.answers.compactMap { answer in
                 guard
-                    let resourceData = answer.resourceData,
-                    answer.resourceDataLength == 16
+                    case .aaaa(let record) = answer,
+                    record.rawAddress.count == 16
                 else {
                     return nil
                 }
-                
-                let ipAddress = resourceData.withUnsafeReadableBytes { buffer in
+
+                let address = record.rawAddress
+                let ipAddress = address.withUnsafeBytes { buffer in
                     // sin6_addr.in6_addr needs to be of type in6_addr.__Unnamed_union___in6_u
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___u6_addr.self).baseAddress!.pointee
                 }
@@ -157,14 +162,14 @@ public final class NioDNS: Resolver {
     /// - parameters:
     ///     - host: Hostname to get the records from
     /// - returns: A future with the resource record
-    public func getSRVRecords(from host: String) -> EventLoopFuture<[SRVData]> {
+    public func getSRVRecords(from host: String) -> EventLoopFuture<[SRVRecord]> {
         return self.sendQuery(forHost: host, type: .srv).thenThrowing { message in
-            return try message.answers.compactMap { answer in
-                guard answer.dataType == ResourceType.srv.rawValue else {
+            return message.answers.compactMap { answer in
+                guard case .srv(let record) = answer else {
                     return nil
                 }
                 
-                return try SRVData(record: answer)
+                return record
             }
         }
     }
@@ -255,7 +260,7 @@ extension ByteBuffer {
             }
         }
         
-        return nil
+        return labels
     }
     
     mutating func readQuestion() -> QuestionSection? {
@@ -274,8 +279,73 @@ extension ByteBuffer {
         
         return QuestionSection(labels: labels, type: type, questionClass: dataClass)
     }
+
+    mutating func readRecord() -> Record? {
+        guard
+            let labels = readLabels(),
+            let typeNumber = readInteger(endianness: endianness, as: UInt16.self),
+            let classNumber = readInteger(endianness: endianness, as: UInt16.self),
+            let ttl = readInteger(endianness: endianness, as: UInt32.self),
+            let dataLength = readInteger(endianness: endianness, as: UInt16.self)
+            else {
+                return nil
+        }
+
+        func makeResourceData() -> ByteBuffer? {
+            return getSlice(at: readerIndex, length: Int(dataLength))
+        }
+
+        func makeOther() -> ResourceRecord {
+            let record = ResourceRecord(
+                domainName: labels,
+                dataType: typeNumber,
+                dataClass: classNumber,
+                ttl: ttl,
+                resourceData: makeResourceData(),
+                resourceDataLength: Int(dataLength)
+            )
+
+            self.moveReaderIndex(forwardBy: Int(dataLength))
+            return record
+        }
+
+        guard let recordType = ResourceType(rawValue: typeNumber) else {
+            return .other(makeOther())
+        }
+
+        switch recordType {
+        case .a:
+            guard
+                let resourceData = makeResourceData(),
+                resourceData.readableBytes == 4,
+                let ipAddress = resourceData.getInteger(at: resourceData.readerIndex, endianness: .little, as: UInt32.self)
+            else {
+                break
+            }
+
+            return .a(ARecord(labels: labels, rawAddress: ipAddress))
+        case .txt:
+            guard let text = readLabels() else {
+                break
+            }
+
+            return .txt(TXTRecord(domainName: labels, text: text.string))
+        case .srv:
+            let record = makeOther()
+
+            do {
+                return try .srv(SRVRecord(record: record))
+            } catch {
+                return .other(record)
+            }
+        default:
+            break
+        }
+
+        return .other(makeOther())
+    }
     
-    mutating func readRecord() -> ResourceRecord? {
+    mutating func readRawRecord() -> ResourceRecord? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: endianness, as: UInt16.self),
@@ -365,8 +435,8 @@ private final class DNSDecoder: ChannelInboundHandler {
             questions.append(question)
         }
         
-        func resourceRecords(count: UInt16) throws -> [ResourceRecord] {
-            var records = [ResourceRecord]()
+        func resourceRecords(count: UInt16) throws -> [Record] {
+            var records = [Record]()
             
             for _ in 0..<count {
                 guard let record = buffer.readRecord() else {
@@ -388,10 +458,7 @@ private final class DNSDecoder: ChannelInboundHandler {
                 additionalData: try resourceRecords(count: header.additionalRecordCount)
             )
             
-            guard
-                let query = messageCache[header.id],
-                let mainClient = mainClient
-            else {
+            guard let query = messageCache[header.id] else {
                 throw UnknownQuery()
             }
             

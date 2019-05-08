@@ -1,6 +1,6 @@
 import NIO
 
-public struct SRVData {
+public struct SRVRecord {
     public let priority: UInt16
     public let weight: UInt16
     public let port: UInt16

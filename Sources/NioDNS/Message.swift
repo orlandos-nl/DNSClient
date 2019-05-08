@@ -160,6 +160,38 @@ public struct QuestionSection {
     public let questionClass: DataClass
 }
 
+public enum Record {
+    case aaaa(AAAARecord)
+    case a(ARecord)
+    case txt(TXTRecord)
+    case srv(SRVRecord)
+    case other(ResourceRecord)
+}
+
+public struct TXTRecord {
+    public let domainName: [DNSLabel]
+    public let text: String
+}
+
+public struct ARecord {
+    public let labels: [DNSLabel]
+    public let rawAddress: UInt32
+    public var stringAddress: String {
+        return withUnsafeBytes(of: rawAddress) { buffer in
+            let buffer = buffer.bindMemory(to: UInt8.self)
+            return "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
+        }
+    }
+}
+
+public struct AAAARecord {
+    public let labels: [DNSLabel]
+    public let rawAddress: ContiguousArray<UInt8>
+//    public var stringAddress: String {
+//        // TODO
+//    }
+}
+
 public struct ResourceRecord {
     public let domainName: [DNSLabel]
     public let dataType: UInt16
@@ -193,25 +225,6 @@ public struct ResourceRecord {
             expireTimeout: expire,
             minimumExpireTimeout: minimumExpire
         )
-    }
-    
-    func parseA() throws -> UInt32 {
-        struct InvalidARecord: Error {}
-        guard
-            let resourceData = self.resourceData,
-            resourceData.readableBytes == 4,
-            let ipAddress = resourceData.getInteger(at: resourceData.readerIndex, endianness: .little, as: UInt32.self)
-            else {
-                throw InvalidARecord()
-        }
-        
-        return ipAddress
-    }
-    
-    func parseAddress4(port: Int) throws -> SocketAddress {
-        let ipAddress = try parseA()
-        
-        return try ipAddress.socketAddress(port: port)
     }
 }
 
@@ -251,7 +264,7 @@ extension Array where Element == DNSLabel {
 public struct Message {
     public internal(set) var header: MessageHeader
     public let questions: [QuestionSection]
-    public let answers: [ResourceRecord]
-    public let authorities: [ResourceRecord]
-    public let additionalData: [ResourceRecord]
+    public let answers: [Record]
+    public let authorities: [Record]
+    public let additionalData: [Record]
 }
