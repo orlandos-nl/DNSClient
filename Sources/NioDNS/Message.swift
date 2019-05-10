@@ -161,57 +161,79 @@ public struct QuestionSection {
 }
 
 public enum Record {
-    case aaaa(AAAARecord)
-    case a(ARecord)
-    case txt(TXTRecord)
-    case srv(SRVRecord)
-    case other(ResourceRecord)
+    case aaaa(ResourceRecord<AAAARecord>)
+    case a(ResourceRecord<ARecord>)
+    case txt(ResourceRecord<TXTRecord>)
+    case srv(ResourceRecord<SRVRecord>)
+    case other(ResourceRecord<ByteBuffer>)
 }
 
-public struct TXTRecord {
-    public let domainName: [DNSLabel]
+public struct TXTRecord: DNSResource {
     public let text: String
+
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> TXTRecord? {
+        guard let labels = buffer.readLabels() else { return nil }
+        return TXTRecord(text: labels.string)
+    }
 }
 
-public struct ARecord {
-    public let labels: [DNSLabel]
-    public let rawAddress: UInt32
+public struct ARecord: DNSResource {
+    public let address: UInt32
     public var stringAddress: String {
-        return withUnsafeBytes(of: rawAddress) { buffer in
+        return withUnsafeBytes(of: address) { buffer in
             let buffer = buffer.bindMemory(to: UInt8.self)
             return "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
         }
     }
+
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> ARecord? {
+        guard let address = buffer.readInteger(endianness: .big, as: UInt32.self) else { return nil }
+        return ARecord(address: address)
+    }
 }
 
-public struct AAAARecord {
-    public let labels: [DNSLabel]
-    public let rawAddress: ContiguousArray<UInt8>
+public struct AAAARecord: DNSResource {
+    public let address: [UInt8]
 //    public var stringAddress: String {
 //        // TODO
 //    }
+
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> AAAARecord? {
+        guard let address = buffer.readBytes(length: 16) else { return nil }
+        return AAAARecord(address: address)
+    }
 }
 
-public struct ResourceRecord {
+public struct ResourceRecord<Resource: DNSResource> {
     public let domainName: [DNSLabel]
     public let dataType: UInt16
     public let dataClass: UInt16
     public let ttl: UInt32
-    public let resourceData: ByteBuffer?
-    public let resourceDataLength: Int
-    
-    func parseSOA() throws -> ZoneAuthority {
-        struct InvalidSOARecord: Error {}
-        
+    public var resource: Resource
+}
+
+public protocol DNSResource {
+    static func read(from buffer: inout ByteBuffer, length: Int) -> Self?
+}
+
+extension ByteBuffer: DNSResource {
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> ByteBuffer? {
+        return buffer.readSlice(length: length)
+    }
+}
+
+fileprivate struct InvalidSOARecord: Error {}
+
+extension ResourceRecord where Resource == ByteBuffer {
+    mutating func parseSOA() throws -> ZoneAuthority {
         guard
-            var resourceData = self.resourceData,
-            let domainName = resourceData.readLabels(),
-            resourceData.readableBytes >= 20, // Minimum 5 UInt32's
-            let serial: UInt32 = resourceData.readInteger(endianness: .big),
-            let refresh: UInt32 = resourceData.readInteger(endianness: .big),
-            let retry: UInt32 = resourceData.readInteger(endianness: .big),
-            let expire: UInt32 = resourceData.readInteger(endianness: .big),
-            let minimumExpire: UInt32 = resourceData.readInteger(endianness: .big)
+            let domainName = resource.readLabels(),
+            resource.readableBytes >= 20, // Minimum 5 UInt32's
+            let serial: UInt32 = resource.readInteger(endianness: .big),
+            let refresh: UInt32 = resource.readInteger(endianness: .big),
+            let retry: UInt32 = resource.readInteger(endianness: .big),
+            let expire: UInt32 = resource.readInteger(endianness: .big),
+            let minimumExpire: UInt32 = resource.readInteger(endianness: .big)
         else {
             throw InvalidSOARecord()
         }

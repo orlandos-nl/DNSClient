@@ -1,6 +1,14 @@
 import NIO
 import CResolvHelpers
 
+var dns4: sockaddr_in = {
+    return initializeDNS4()
+}()
+
+var dns6: sockaddr_in6 = {
+    return initializeDNS6()
+}()
+
 public final class NioDNS: Resolver {
     fileprivate let dnsDecoder: DNSDecoder
     let channel: Channel
@@ -26,7 +34,7 @@ public final class NioDNS: Resolver {
                     return nil
                 }
 
-                return try? record.rawAddress.socketAddress(port: port)
+                return try? record.resource.address.socketAddress(port: port)
             }
         }
     }
@@ -44,12 +52,12 @@ public final class NioDNS: Resolver {
             return message.answers.compactMap { answer in
                 guard
                     case .aaaa(let record) = answer,
-                    record.rawAddress.count == 16
+                    record.resource.address.count == 16
                 else {
                     return nil
                 }
 
-                let address = record.rawAddress
+                let address = record.resource.address
                 let ipAddress = address.withUnsafeBytes { buffer in
                     // sin6_addr.in6_addr needs to be of type in6_addr.__Unnamed_union___in6_u
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___u6_addr.self).baseAddress!.pointee
@@ -75,6 +83,27 @@ public final class NioDNS: Resolver {
             dnsDecoder.messageCache[id] = nil
             query.promise.fail(error: CancelError())
         }
+    }
+
+    /// Connect to the dns server
+    ///
+    /// - parameters:
+    ///     - group: EventLoops to use
+    /// - returns: Future with the NioDNS client
+    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
+        let address: SocketAddress
+
+        if dns4.sin_addr.s_addr != 0 {
+            address = withUnsafeBytes(of: dns4.sin_addr.s_addr) { buffer in
+                let buffer = buffer.bindMemory(to: UInt8.self)
+                let name = "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
+                return SocketAddress(dns4, host: name)
+            }
+        } else {
+            address = SocketAddress(dns6, host: "")
+        }
+
+        return connect(on: group, address: address)
     }
     
     /// Connect to the dns server
@@ -102,8 +131,9 @@ public final class NioDNS: Resolver {
                     return channel.pipeline.add(handler: DNSEncoder())
                 }
         }
-        
-        return bootstrap.bind(host: "0.0.0.0", port: 0).map { channel in
+
+        let ipv4 = address.protocolFamily == PF_INET
+        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::1", port: 0).map { channel in
             let client = NioDNS(
                 channel: channel,
                 address: address,
@@ -162,7 +192,7 @@ public final class NioDNS: Resolver {
     /// - parameters:
     ///     - host: Hostname to get the records from
     /// - returns: A future with the resource record
-    public func getSRVRecords(from host: String) -> EventLoopFuture<[SRVRecord]> {
+    public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord<SRVRecord>]> {
         return self.sendQuery(forHost: host, type: .srv).thenThrowing { message in
             return message.answers.compactMap { answer in
                 guard case .srv(let record) = answer else {
@@ -291,67 +321,66 @@ extension ByteBuffer {
                 return nil
         }
 
-        func makeResourceData() -> ByteBuffer? {
-            return getSlice(at: readerIndex, length: Int(dataLength))
-        }
+        func make<Resource>(_ resource: Resource.Type) -> ResourceRecord<Resource>? {
+            guard let resource = Resource.read(from: &self, length: Int(dataLength)) else {
+                return nil
+            }
 
-        func makeOther() -> ResourceRecord {
-            let record = ResourceRecord(
+            return ResourceRecord(
                 domainName: labels,
                 dataType: typeNumber,
                 dataClass: classNumber,
                 ttl: ttl,
-                resourceData: makeResourceData(),
-                resourceDataLength: Int(dataLength)
+                resource: resource
             )
-
-            self.moveReaderIndex(forwardBy: Int(dataLength))
-            return record
         }
 
         guard let recordType = ResourceType(rawValue: typeNumber) else {
-            return .other(makeOther())
+            guard let other = make(ByteBuffer.self) else { return nil }
+            return .other(other)
         }
 
         switch recordType {
         case .a:
-            guard
-                let resourceData = makeResourceData(),
-                resourceData.readableBytes == 4,
-                let ipAddress = resourceData.getInteger(at: resourceData.readerIndex, endianness: .little, as: UInt32.self)
-            else {
-                break
+            guard let a = make(ARecord.self) else {
+                return nil
             }
 
-            return .a(ARecord(labels: labels, rawAddress: ipAddress))
+            return .a(a)
+        case .aaaa:
+            guard let aaaa = make(AAAARecord.self) else {
+                return nil
+            }
+
+            return .aaaa(aaaa)
         case .txt:
-            guard let text = readLabels() else {
-                break
+            guard let txt = make(TXTRecord.self) else {
+                return nil
             }
 
-            return .txt(TXTRecord(domainName: labels, text: text.string))
+            return .txt(txt)
         case .srv:
-            let record = makeOther()
-
-            do {
-                return try .srv(SRVRecord(record: record))
-            } catch {
-                return .other(record)
+            guard let srv = make(SRVRecord.self) else {
+                return nil
             }
+
+            return .srv(srv)
         default:
             break
         }
 
-        return .other(makeOther())
+        guard let other = make(ByteBuffer.self) else { return nil }
+        return .other(other)
     }
     
-    mutating func readRawRecord() -> ResourceRecord? {
+    mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: endianness, as: UInt16.self),
             let classNumber = readInteger(endianness: endianness, as: UInt16.self),
             let ttl = readInteger(endianness: endianness, as: UInt32.self),
-            let dataLength = readInteger(endianness: endianness, as: UInt16.self)
+            let dataLength = readInteger(endianness: endianness, as: UInt16.self),
+            let resource = ByteBuffer.read(from: &self, length: Int(dataLength))
         else {
             return nil
         }
@@ -361,8 +390,7 @@ extension ByteBuffer {
             dataType: typeNumber,
             dataClass: classNumber,
             ttl: ttl,
-            resourceData: self.getSlice(at: readerIndex, length: Int(dataLength)),
-            resourceDataLength: Int(dataLength)
+            resource: resource
         )
         
         self.moveReaderIndex(forwardBy: Int(dataLength))

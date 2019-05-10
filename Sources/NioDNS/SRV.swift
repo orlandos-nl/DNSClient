@@ -1,28 +1,21 @@
 import NIO
 
-public struct SRVRecord {
+public struct SRVRecord: DNSResource {
     public let priority: UInt16
     public let weight: UInt16
     public let port: UInt16
     public let domainName: [DNSLabel]
-    
-    init(record: ResourceRecord) throws {
+
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> SRVRecord? {
         guard
-            var byteBuffer = record.resourceData,
-            let priority = byteBuffer.readInteger(endianness: .big, as: UInt16.self),
-            let weight = byteBuffer.readInteger(endianness: .big, as: UInt16.self),
-            let port = byteBuffer.readInteger(endianness: .big, as: UInt16.self),
-            let domainName = byteBuffer.readLabels()
+            let priority = buffer.readInteger(endianness: .big, as: UInt16.self),
+            let weight = buffer.readInteger(endianness: .big, as: UInt16.self),
+            let port = buffer.readInteger(endianness: .big, as: UInt16.self),
+            let domainName = buffer.readLabels()
         else {
-            throw InvalidSRV()
+            return nil
         }
-        
-        self.priority = priority
-        self.weight = weight
-        self.port = port
-        self.domainName = domainName
-//        guard let priority = byteBuffer.getInteger
+
+        return SRVRecord(priority: priority, weight: weight, port: port, domainName: domainName)
     }
 }
-
-fileprivate struct InvalidSRV: Error {}
