@@ -3,13 +3,13 @@
 
 struct sockaddr_in initializeDNS4() {
     struct __res_state *res;
+    union res_sockaddr_union servers;
     res = malloc(sizeof(struct __res_state));
 
     if(res_ninit(res) < 0) {
-        return;
+        return servers.sin;
     }
 
-    union res_sockaddr_union servers;
     res_getservers(res, &servers, 1);
 
     return servers.sin;
@@ -18,12 +18,12 @@ struct sockaddr_in initializeDNS4() {
 struct sockaddr_in6 initializeDNS6() {
     struct __res_state *res;
     res = malloc(sizeof(struct __res_state));
+    union res_sockaddr_union servers;
 
     if(res_ninit(res) < 0) {
-        return;
+        return servers.sin6;
     }
 
-    union res_sockaddr_union servers;
     res_getservers(res, &servers, 1);
 
     return servers.sin6;
