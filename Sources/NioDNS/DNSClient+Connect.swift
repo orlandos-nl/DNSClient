@@ -34,7 +34,7 @@ extension NioDNS {
     }
 
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<NioDNS> {
-        guard let address = config.first else {
+        guard let address = config.preferred else {
             return group.next().newFailedFuture(error: MissingNameservers())
         }
 
@@ -50,7 +50,7 @@ extension NioDNS {
         }
 
         let ipv4 = address.protocolFamily == PF_INET
-        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::1", port: 0).map { channel in
+        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
             let client = NioDNS(
                 channel: channel,
                 address: address,
@@ -60,5 +60,11 @@ extension NioDNS {
             dnsDecoder.mainClient = client
             return client
         }
+    }
+}
+
+fileprivate extension Array where Element == SocketAddress {
+    var preferred: SocketAddress? {
+        return first(where: { $0.protocolFamily == PF_INET }) ?? first
     }
 }
