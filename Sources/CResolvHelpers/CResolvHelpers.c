@@ -1,4 +1,5 @@
 #include <resolv.h>
+#include <stdlib.h>
 #include "CResolvHelpers.h"
 
 struct sockaddr_in initializeDNS4() {

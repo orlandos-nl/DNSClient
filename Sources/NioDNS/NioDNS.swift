@@ -1,16 +1,16 @@
 import NIO
 import CResolvHelpers
 
-var dns4: sockaddr_in = {
+var ipv4DnsServer: sockaddr_in = {
     return initializeDNS4()
 }()
 
-var dns6: sockaddr_in6 = {
+var ipv6DnsServer: sockaddr_in6 = {
     return initializeDNS6()
 }()
 
 public final class NioDNS: Resolver {
-    fileprivate let dnsDecoder: DNSDecoder
+    let dnsDecoder: DNSDecoder
     let channel: Channel
     let primaryAddress: SocketAddress
     var loop: EventLoop {
@@ -84,72 +84,12 @@ public final class NioDNS: Resolver {
             query.promise.fail(error: CancelError())
         }
     }
-
-    /// Connect to the dns server
-    ///
-    /// - parameters:
-    ///     - group: EventLoops to use
-    /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
-        let address: SocketAddress
-
-        if dns4.sin_addr.s_addr != 0 {
-            address = withUnsafeBytes(of: dns4.sin_addr.s_addr) { buffer in
-                let buffer = buffer.bindMemory(to: UInt8.self)
-                let name = "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
-                return SocketAddress(dns4, host: name)
-            }
-        } else {
-            address = SocketAddress(dns6, host: "")
-        }
-
-        return connect(on: group, address: address)
-    }
-    
-    /// Connect to the dns server
-    ///
-    /// - parameters:
-    ///     - group: EventLoops to use
-    ///     - host: DNS host to connect to
-    /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
-        do {
-            return connect(on: group, address: try SocketAddress(ipAddress: host, port: 53))
-        } catch {
-            return group.next().newFailedFuture(error: error)
-        }
-    }
-    
-    public static func connect(on group: EventLoopGroup, address: SocketAddress) -> EventLoopFuture<NioDNS> {
-        let dnsDecoder = DNSDecoder(group: group)
-        
-        let bootstrap = DatagramBootstrap(group: group)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
-            .channelInitializer { channel in
-                return channel.pipeline.add(handler: dnsDecoder).then {
-                    return channel.pipeline.add(handler: DNSEncoder())
-                }
-        }
-
-        let ipv4 = address.protocolFamily == PF_INET
-        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::1", port: 0).map { channel in
-            let client = NioDNS(
-                channel: channel,
-                address: address,
-                decoder: dnsDecoder
-            )
-            
-            dnsDecoder.mainClient = client
-            return client
-        }
-    }
     
     deinit {
         _ = channel.close(mode: .all)
     }
     
-    fileprivate init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
+    init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
         self.channel = channel
         self.primaryAddress = address
         self.dnsDecoder = decoder
@@ -398,7 +338,7 @@ extension ByteBuffer {
     }
 }
 
-private final class DNSEncoder: ChannelOutboundHandler {
+final class DNSEncoder: ChannelOutboundHandler {
     typealias OutboundIn = AddressedEnvelope<Message>
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
     
@@ -431,7 +371,7 @@ struct SentQuery {
     let promise: EventLoopPromise<Message>
 }
 
-private final class DNSDecoder: ChannelInboundHandler {
+final class DNSDecoder: ChannelInboundHandler {
     let group: EventLoopGroup
     var messageCache = [UInt16: SentQuery]()
     var clients = [ObjectIdentifier: NioDNS]()
