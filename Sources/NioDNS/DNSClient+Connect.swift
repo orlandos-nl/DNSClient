@@ -1,4 +1,5 @@
 import NIO
+import Foundation
 
 extension NioDNS {
     /// Connect to the dns server
@@ -7,20 +8,14 @@ extension NioDNS {
     ///     - group: EventLoops to use
     /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
-        let address: SocketAddress
+        do {
+            let configString = try String(contentsOfFile: "/etc/resolv.conf")
+            let config = try ResolvConf(from: configString)
 
-        if ipv4DnsServer.sin_addr.s_addr != 0 {
-            address = withUnsafeBytes(of: ipv4DnsServer.sin_addr.s_addr) { buffer in
-                let buffer = buffer.bindMemory(to: UInt8.self)
-                let name = "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
-                return SocketAddress(ipv4DnsServer, host: name)
-            }
-        } else {
-            // TODO: Create string hostname
-            address = SocketAddress(ipv6DnsServer, host: "")
+            return connect(on: group, config: config.nameservers)
+        } catch {
+            return group.next().newFailedFuture(error: UnableToParseConfig())
         }
-
-        return connect(on: group, address: address)
     }
 
     /// Connect to the dns server
@@ -31,13 +26,18 @@ extension NioDNS {
     /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
         do {
-            return connect(on: group, address: try SocketAddress(ipAddress: host, port: 53))
+            let address = try SocketAddress(ipAddress: host, port: 53)
+            return connect(on: group, config: [address])
         } catch {
             return group.next().newFailedFuture(error: error)
         }
     }
 
-    public static func connect(on group: EventLoopGroup, address: SocketAddress) -> EventLoopFuture<NioDNS> {
+    public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<NioDNS> {
+        guard let address = config.first else {
+            return group.next().newFailedFuture(error: MissingNameservers())
+        }
+
         let dnsDecoder = DNSDecoder(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)

@@ -1,13 +1,4 @@
 import NIO
-import CResolvHelpers
-
-var ipv4DnsServer: sockaddr_in = {
-    return initializeDNS4()
-}()
-
-var ipv6DnsServer: sockaddr_in6 = {
-    return initializeDNS6()
-}()
 
 public final class NioDNS: Resolver {
     let dnsDecoder: DNSDecoder
@@ -147,6 +138,8 @@ public final class NioDNS: Resolver {
 
 fileprivate let endianness = Endianness.big
 
+struct UnableToParseConfig: Error {}
+struct MissingNameservers: Error {}
 struct CancelError: Error {}
 struct AuthorityNotFound: Error {}
 struct ProtocolError: Error {}
