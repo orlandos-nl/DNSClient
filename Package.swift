@@ -1,4 +1,4 @@
-// swift-tools-version:4.2
+// swift-tools-version:5.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -23,7 +23,7 @@ let package = Package(
         .target(
             name: "NioDNS",
             dependencies: ["NIO", "CResolvHelpers"]),
-        .target(name: "CResolvHelpers"),
+        .target(name: "CResolvHelpers", linkerSettings: [LinkerSetting.linkedLibrary("resolv")]),
         .testTarget(
             name: "NioDNSTests",
             dependencies: ["NioDNS", "NIO"]),
