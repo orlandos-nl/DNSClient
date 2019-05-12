@@ -1,13 +1,13 @@
 import NIO
 import Foundation
 
-extension NioDNS {
+extension DNSClient {
     /// Connect to the dns server
     ///
     /// - parameters:
     ///     - group: EventLoops to use
     /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<NioDNS> {
+    public static func connect(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
             let configString = try String(contentsOfFile: "/etc/resolv.conf")
             let config = try ResolvConf(from: configString)
@@ -24,7 +24,7 @@ extension NioDNS {
     ///     - group: EventLoops to use
     ///     - host: DNS host to connect to
     /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<NioDNS> {
+    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<DNSClient> {
         do {
             let address = try SocketAddress(ipAddress: host, port: 53)
             return connect(on: group, config: [address])
@@ -33,7 +33,7 @@ extension NioDNS {
         }
     }
 
-    public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<NioDNS> {
+    public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().newFailedFuture(error: MissingNameservers())
         }
@@ -51,7 +51,7 @@ extension NioDNS {
 
         let ipv4 = address.protocolFamily == PF_INET
         return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
-            let client = NioDNS(
+            let client = DNSClient(
                 channel: channel,
                 address: address,
                 decoder: dnsDecoder

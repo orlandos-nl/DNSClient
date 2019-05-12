@@ -1,6 +1,6 @@
 import NIO
 
-extension NioDNS {
+extension DNSClient {
     /// Request A records
     ///
     /// - parameters:

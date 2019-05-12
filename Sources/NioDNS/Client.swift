@@ -1,6 +1,6 @@
 import NIO
 
-public final class NioDNS: Resolver {
+public final class DNSClient: Resolver {
     let dnsDecoder: DNSDecoder
     let channel: Channel
     let primaryAddress: SocketAddress

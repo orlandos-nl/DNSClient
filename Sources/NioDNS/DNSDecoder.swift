@@ -3,8 +3,8 @@ import NIO
 final class DNSDecoder: ChannelInboundHandler {
     let group: EventLoopGroup
     var messageCache = [UInt16: SentQuery]()
-    var clients = [ObjectIdentifier: NioDNS]()
-    weak var mainClient: NioDNS?
+    var clients = [ObjectIdentifier: DNSClient]()
+    weak var mainClient: DNSClient?
 
     init(group: EventLoopGroup) {
         self.group = group
