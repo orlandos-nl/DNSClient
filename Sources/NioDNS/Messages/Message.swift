@@ -166,7 +166,7 @@ extension UInt32 {
         let text = inet_ntoa(in_addr(s_addr: self))!
         let host = String(cString: text)
         
-        return try SocketAddress(ipAddress: host, port: UInt16(port))
+        return try SocketAddress(ipAddress: host, port: Int(port))
     }
 }
 

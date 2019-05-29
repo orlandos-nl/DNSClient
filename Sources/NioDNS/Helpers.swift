@@ -2,12 +2,12 @@ import NIO
 
 extension ByteBuffer {
     mutating func write(_ header: MessageHeader) {
-        write(integer: header.id, endianness: .big)
-        write(integer: header.options.rawValue, endianness: .big)
-        write(integer: header.questionCount, endianness: .big)
-        write(integer: header.answerCount, endianness: .big)
-        write(integer: header.authorityCount, endianness: .big)
-        write(integer: header.additionalRecordCount, endianness: .big)
+		writeInteger(header.id, endianness: .big, as: UInt16.self)
+        writeInteger(header.options.rawValue, endianness: .big, as: UInt16.self)
+        writeInteger(header.questionCount, endianness: .big, as: UInt16.self)
+        writeInteger(header.answerCount, endianness: .big, as: UInt16.self)
+        writeInteger(header.authorityCount, endianness: .big, as: UInt16.self)
+        writeInteger(header.additionalRecordCount, endianness: .big, as: UInt16.self)
     }
 
     mutating func readHeader() -> MessageHeader? {

@@ -15,13 +15,12 @@ final class DNSEncoder: ChannelOutboundHandler {
 
         for question in message.questions {
             for label in question.labels {
-                out.write(integer: label.length, endianness: .big)
-                out.write(bytes: label.label)
+				out.writeInteger(label.length, endianness: .big, as: UInt8.self)
+                out.writeBytes(label.label)
             }
-
-            out.write(integer: 0, endianness: .big, as: UInt8.self)
-            out.write(integer: question.type.rawValue, endianness: .big)
-            out.write(integer: question.questionClass.rawValue, endianness: .big)
+			out.writeInteger(0, endianness: .big, as: UInt8.self)
+			out.writeInteger(question.type.rawValue, endianness: .big, as: UInt16.self)
+			out.writeInteger(question.questionClass.rawValue, endianness: .big, as: UInt16.self)
         }
 
         ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
