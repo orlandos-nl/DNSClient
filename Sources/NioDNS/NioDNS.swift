@@ -19,7 +19,7 @@ public final class NioDNS: Resolver {
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         let result = self.sendQuery(forHost: host, type: .a)
         
-        return result.thenThrowing { message in
+        return result.map { message in
             return message.answers.compactMap { answer in
                 guard case .a(let record) = answer else {
                     return nil
@@ -72,7 +72,7 @@ public final class NioDNS: Resolver {
     public func cancelQueries() {
         for (id, query) in dnsDecoder.messageCache {
             dnsDecoder.messageCache[id] = nil
-            query.promise.fail(error: CancelError())
+            query.promise.fail(CancelError())
         }
     }
     
@@ -110,7 +110,7 @@ public final class NioDNS: Resolver {
     }
     
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
-        let promise: EventLoopPromise<Message> = loop.newPromise()
+        let promise: EventLoopPromise<Message> = loop.makePromise()
         dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
         
         channel.writeAndFlush(AddressedEnvelope(remoteAddress: address ?? primaryAddress, data: message), promise: nil)
@@ -124,7 +124,7 @@ public final class NioDNS: Resolver {
     ///     - host: Hostname to get the records from
     /// - returns: A future with the resource record
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord<SRVRecord>]> {
-        return self.sendQuery(forHost: host, type: .srv).thenThrowing { message in
+        return self.sendQuery(forHost: host, type: .srv).map { message in
             return message.answers.compactMap { answer in
                 guard case .srv(let record) = answer else {
                     return nil
@@ -147,12 +147,12 @@ struct UnknownQuery: Error {}
 
 extension ByteBuffer {
     mutating func write(_ header: MessageHeader) {
-        write(integer: header.id, endianness: endianness)
-        write(integer: header.options.rawValue, endianness: endianness)
-        write(integer: header.questionCount, endianness: endianness)
-        write(integer: header.answerCount, endianness: endianness)
-        write(integer: header.authorityCount, endianness: endianness)
-        write(integer: header.additionalRecordCount, endianness: endianness)
+        writeInteger(header.id, endianness: endianness)
+        writeInteger(header.options.rawValue, endianness: endianness)
+        writeInteger(header.questionCount, endianness: endianness)
+        writeInteger(header.answerCount, endianness: endianness)
+        writeInteger(header.authorityCount, endianness: endianness)
+        writeInteger(header.additionalRecordCount, endianness: endianness)
     }
     
     mutating func readHeader() -> MessageHeader? {
@@ -346,13 +346,13 @@ final class DNSEncoder: ChannelOutboundHandler {
         
         for question in message.questions {
             for label in question.labels {
-                out.write(integer: label.length, endianness: endianness)
-                out.write(bytes: label.label)
+                out.writeInteger(label.length, endianness: endianness)
+                out.writeBytes(label.label)
             }
             
-            out.write(integer: 0, endianness: endianness, as: UInt8.self)
-            out.write(integer: question.type.rawValue, endianness: endianness)
-            out.write(integer: question.questionClass.rawValue, endianness: endianness)
+            out.writeInteger(0, endianness: endianness, as: UInt8.self)
+            out.writeInteger(question.type.rawValue, endianness: endianness)
+            out.writeInteger(question.questionClass.rawValue, endianness: endianness)
         }
         
         ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
@@ -423,10 +423,10 @@ final class DNSDecoder: ChannelInboundHandler {
                 throw UnknownQuery()
             }
             
-            query.promise.succeed(result: message)
+            query.promise.succeed(message)
             messageCache[header.id] = nil
         } catch {
-            messageCache[header.id]?.promise.fail(error: error)
+            messageCache[header.id]?.promise.fail(error)
             messageCache[header.id] = nil
             ctx.fireErrorCaught(error)
         }
@@ -434,7 +434,7 @@ final class DNSDecoder: ChannelInboundHandler {
     
     func errorCaught(ctx: ChannelHandlerContext, error: Error) {
         for query in self.messageCache.values {
-            query.promise.fail(error: error)
+            query.promise.fail(error)
         }
         
         messageCache = [:]

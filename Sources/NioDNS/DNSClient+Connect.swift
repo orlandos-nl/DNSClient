@@ -14,7 +14,7 @@ extension NioDNS {
 
             return connect(on: group, config: config.nameservers)
         } catch {
-            return group.next().newFailedFuture(error: UnableToParseConfig())
+            return group.next().makeFailedFuture(UnableToParseConfig())
         }
     }
 
@@ -29,13 +29,13 @@ extension NioDNS {
             let address = try SocketAddress(ipAddress: host, port: 53)
             return connect(on: group, config: [address])
         } catch {
-            return group.next().newFailedFuture(error: error)
+            return group.next().makeFailedFuture(error)
         }
     }
 
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<NioDNS> {
         guard let address = config.first else {
-            return group.next().newFailedFuture(error: MissingNameservers())
+            return group.next().makeFailedFuture(MissingNameservers())
         }
 
         let dnsDecoder = DNSDecoder(group: group)
@@ -44,8 +44,8 @@ extension NioDNS {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
-                return channel.pipeline.add(handler: dnsDecoder).then {
-                    return channel.pipeline.add(handler: DNSEncoder())
+                return channel.pipeline.addHandler(dnsDecoder).flatMap {
+                    return channel.pipeline.addHandler(DNSEncoder())
                 }
         }
 
