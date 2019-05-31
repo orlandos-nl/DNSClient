@@ -59,10 +59,10 @@ final class DNSDecoder: ChannelInboundHandler {
                 throw UnknownQuery()
             }
 
-            query.promise.succeed(result: message)
+            query.promise.succeed(message)
             messageCache[header.id] = nil
         } catch {
-            messageCache[header.id]?.promise.fail(error: error)
+            messageCache[header.id]?.promise.fail(error)
             messageCache[header.id] = nil
             ctx.fireErrorCaught(error)
         }
@@ -70,7 +70,7 @@ final class DNSDecoder: ChannelInboundHandler {
 
     func errorCaught(ctx: ChannelHandlerContext, error: Error) {
         for query in self.messageCache.values {
-            query.promise.fail(error: error)
+            query.promise.fail(error)
         }
 
         messageCache = [:]

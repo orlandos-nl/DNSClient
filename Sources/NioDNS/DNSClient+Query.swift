@@ -10,7 +10,7 @@ extension DNSClient {
     public func initiateAQuery(host: String, port: Int) -> EventLoopFuture<[SocketAddress]> {
         let result = self.sendQuery(forHost: host, type: .a)
 
-        return result.thenThrowing { message in
+        return result.map { message in
             return message.answers.compactMap { answer in
                 guard case .a(let record) = answer else {
                     return nil
@@ -66,7 +66,7 @@ extension DNSClient {
     public func cancelQueries() {
         for (id, query) in dnsDecoder.messageCache {
             dnsDecoder.messageCache[id] = nil
-            query.promise.fail(error: CancelError())
+            query.promise.fail(CancelError())
         }
     }
 
@@ -94,7 +94,7 @@ extension DNSClient {
     }
 
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
-        let promise: EventLoopPromise<Message> = loop.newPromise()
+        let promise: EventLoopPromise<Message> = loop.makePromise()
         dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
 
         channel.writeAndFlush(AddressedEnvelope(remoteAddress: address ?? primaryAddress, data: message), promise: nil)
@@ -108,7 +108,7 @@ extension DNSClient {
     ///     - host: Hostname to get the records from
     /// - returns: A future with the resource record
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord<SRVRecord>]> {
-        return self.sendQuery(forHost: host, type: .srv).thenThrowing { message in
+        return self.sendQuery(forHost: host, type: .srv).map { message in
             return message.answers.compactMap { answer in
                 guard case .srv(let record) = answer else {
                     return nil
