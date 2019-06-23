@@ -4,13 +4,13 @@ import NioDNS
 
 final class NioDNSTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
-    var dnsClient: NioDNS!
+    var dnsClient: DNSClient!
 
     override func setUp() {
         super.setUp()
         do {
             group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-            dnsClient = try NioDNS.connect(on: group, host: "8.8.8.8").wait()
+            dnsClient = try DNSClient.connect(on: group, host: "8.8.8.8").wait()
         } catch let error {
             XCTFail("\(error)")
         }

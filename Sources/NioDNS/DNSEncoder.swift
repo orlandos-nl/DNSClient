@@ -4,7 +4,7 @@ final class DNSEncoder: ChannelOutboundHandler {
     typealias OutboundIn = AddressedEnvelope<Message>
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
 
-    func write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+    func write(context ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         let data = self.unwrapOutboundIn(data)
         let message = data.data
         var out = ctx.channel.allocator.buffer(capacity: 512)

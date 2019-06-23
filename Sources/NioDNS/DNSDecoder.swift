@@ -12,7 +12,7 @@ final class DNSDecoder: ChannelInboundHandler {
 
     public typealias InboundIn = AddressedEnvelope<ByteBuffer>
 
-    public func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
+    public func channelRead(context ctx: ChannelHandlerContext, data: NIOAny) {
         let envelope = self.unwrapInboundIn(data)
         var buffer = envelope.data
 
