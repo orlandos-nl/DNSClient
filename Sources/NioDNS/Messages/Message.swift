@@ -163,7 +163,7 @@ extension ResourceRecord where Resource == ByteBuffer {
 
 extension UInt32 {
     func socketAddress(port: Int) throws -> SocketAddress {
-        let text = inet_ntoa(in_addr(s_addr: self))!
+        let text = inet_ntoa(in_addr(s_addr: self.bigEndian))!
         let host = String(cString: text)
         
         return try SocketAddress(ipAddress: host, port: port)
