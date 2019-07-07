@@ -11,13 +11,14 @@ final class DNSDecoder: ChannelInboundHandler {
     }
 
     public typealias InboundIn = AddressedEnvelope<ByteBuffer>
-
-    public func channelRead(context ctx: ChannelHandlerContext, data: NIOAny) {
+    public typealias OutboundOut = AddressedEnvelope<ByteBuffer>
+    
+    public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let envelope = self.unwrapInboundIn(data)
         var buffer = envelope.data
 
         guard let header = buffer.readHeader() else {
-            ctx.fireErrorCaught(ProtocolError())
+            context.fireErrorCaught(ProtocolError())
             return
         }
 
@@ -25,7 +26,7 @@ final class DNSDecoder: ChannelInboundHandler {
 
         for _ in 0..<header.questionCount {
             guard let question = buffer.readQuestion() else {
-                ctx.fireErrorCaught(ProtocolError())
+                context.fireErrorCaught(ProtocolError())
                 return
             }
 
@@ -64,11 +65,11 @@ final class DNSDecoder: ChannelInboundHandler {
         } catch {
             messageCache[header.id]?.promise.fail(error)
             messageCache[header.id] = nil
-            ctx.fireErrorCaught(error)
+            context.fireErrorCaught(error)
         }
     }
 
-    func errorCaught(ctx: ChannelHandlerContext, error: Error) {
+    func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
         for query in self.messageCache.values {
             query.promise.fail(error)
         }

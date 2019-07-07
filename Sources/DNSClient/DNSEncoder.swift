@@ -3,11 +3,19 @@ import NIO
 final class DNSEncoder: ChannelOutboundHandler {
     typealias OutboundIn = AddressedEnvelope<Message>
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
+    
+    init() {}
+    
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let message = unwrapOutboundIn(data)
+        let data = DNSEncoder.encodeMessage(message.data, allocator: context.channel.allocator)
 
-    func write(context ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let data = self.unwrapOutboundIn(data)
-        let message = data.data
-        var out = ctx.channel.allocator.buffer(capacity: 512)
+        let envelope = AddressedEnvelope(remoteAddress: message.remoteAddress, data: data)
+        context.write(wrapOutboundOut(envelope), promise: promise)
+    }
+    
+    static func encodeMessage(_ message: Message, allocator: ByteBufferAllocator) -> ByteBuffer {
+        var out = allocator.buffer(capacity: 512)
 
         let header = message.header
 
@@ -24,6 +32,6 @@ final class DNSEncoder: ChannelOutboundHandler {
             out.writeInteger(question.questionClass.rawValue, endianness: .big)
         }
 
-        ctx.write(self.wrapOutboundOut(AddressedEnvelope(remoteAddress: data.remoteAddress, data: out)), promise: promise)
+        return out
     }
 }

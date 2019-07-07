@@ -1,7 +1,8 @@
 import NIO
 import Foundation
 
-public struct MessageHeader {
+/// The header of a
+public struct DNSMessageHeader {
     public internal(set) var id: UInt16
     
     public let options: MessageOptions
@@ -30,7 +31,7 @@ public struct DNSLabel: ExpressibleByStringLiteral {
     }
 }
 
-public enum ResourceType: UInt16 {
+public enum DNSResourceType: UInt16 {
     case a = 1
     case ns
     case md
@@ -57,7 +58,7 @@ public enum ResourceType: UInt16 {
     case any = 255
 }
 
-public typealias QuestionType = ResourceType
+public typealias QuestionType = DNSResourceType
 
 public enum DataClass: UInt16 {
     case internet = 1
@@ -195,7 +196,7 @@ extension Array where Element == DNSLabel {
 // TODO: https://tools.ietf.org/html/rfc1035 section 4.1.4 compression
 
 public struct Message {
-    public internal(set) var header: MessageHeader
+    public internal(set) var header: DNSMessageHeader
     public let questions: [QuestionSection]
     public let answers: [Record]
     public let authorities: [Record]

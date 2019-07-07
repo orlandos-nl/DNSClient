@@ -1,7 +1,7 @@
 import NIO
 
 extension ByteBuffer {
-    mutating func write(_ header: MessageHeader) {
+    mutating func write(_ header: DNSMessageHeader) {
         writeInteger(header.id, endianness: .big)
         writeInteger(header.options.rawValue, endianness: .big)
         writeInteger(header.questionCount, endianness: .big)
@@ -10,7 +10,7 @@ extension ByteBuffer {
         writeInteger(header.additionalRecordCount, endianness: .big)
     }
 
-    mutating func readHeader() -> MessageHeader? {
+    mutating func readHeader() -> DNSMessageHeader? {
         guard
             let id = readInteger(endianness: .big, as: UInt16.self),
             let options = readInteger(endianness: .big, as: UInt16.self),
@@ -22,7 +22,7 @@ extension ByteBuffer {
                 return nil
         }
 
-        return MessageHeader(
+        return DNSMessageHeader(
             id: id,
             options: MessageOptions(rawValue: options),
             questionCount: questionCount,
@@ -45,7 +45,7 @@ extension ByteBuffer {
                     return nil
                 }
 
-                moveReaderIndex(to: readerIndex &- 1)
+                moveReaderIndex(to: readerIndex - 1)
 
                 guard
                     var offset = self.readInteger(endianness: .big, as: UInt16.self)
@@ -123,7 +123,7 @@ extension ByteBuffer {
             )
         }
 
-        guard let recordType = ResourceType(rawValue: typeNumber) else {
+        guard let recordType = DNSResourceType(rawValue: typeNumber) else {
             guard let other = make(ByteBuffer.self) else { return nil }
             return .other(other)
         }

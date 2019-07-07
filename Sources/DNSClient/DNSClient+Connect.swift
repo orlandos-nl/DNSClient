@@ -44,9 +44,7 @@ extension DNSClient {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
-                return channel.pipeline.addHandler(dnsDecoder).flatMap {
-                    return channel.pipeline.addHandler(DNSEncoder())
-                }
+                return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
         }
 
         let ipv4 = address.protocolFamily == PF_INET

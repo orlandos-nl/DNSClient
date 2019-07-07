@@ -77,7 +77,7 @@ extension DNSClient {
     ///     - type: The resource you want to request
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
-    public func sendQuery(forHost address: String, type: ResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
+    public func sendQuery(forHost address: String, type: DNSResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
         messageID = messageID &+ 1
 
         var options: MessageOptions = [.standardQuery, .recursionDesired]
@@ -85,7 +85,7 @@ extension DNSClient {
             options.insert(additionalOptions)
         }
 
-        let header = MessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+        let header = DNSMessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
         let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
         let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
         let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
@@ -96,8 +96,14 @@ extension DNSClient {
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
         let promise: EventLoopPromise<Message> = loop.makePromise()
         dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
-
+        
         channel.writeAndFlush(AddressedEnvelope(remoteAddress: address ?? primaryAddress, data: message), promise: nil)
+        
+        struct DNSTimeoutError: Error {}
+        
+        loop.scheduleTask(in: .seconds(30)) {
+            promise.fail(DNSTimeoutError())
+        }
 
         return promise.futureResult
     }
