@@ -1,6 +1,6 @@
 import XCTest
 import NIO
-import NioDNS
+import DNSClient
 
 final class DNSClientTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!

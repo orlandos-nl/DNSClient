@@ -1,6 +1,6 @@
 import XCTest
-import NioDNSTests
+import DNSClientTests
 
 var tests = [XCTestCaseEntry]()
-tests += NioDNSTests.allTests()
+tests += DNSClientTests.allTests()
 XCTMain(tests)
