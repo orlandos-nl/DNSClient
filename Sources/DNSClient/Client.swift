@@ -15,9 +15,23 @@ public final class DNSClient: Resolver {
         self.primaryAddress = address
         self.dnsDecoder = decoder
     }
+    
+    public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext) {
+        self.channel = channel
+        self.primaryAddress = dnsServerAddress
+        self.dnsDecoder = context.decoder
+    }
 
     deinit {
         _ = channel.close(mode: .all)
+    }
+}
+
+public struct DNSClientContext {
+    internal let decoder: DNSDecoder
+    
+    public init(eventLoopGroup: EventLoopGroup) {
+        self.decoder = DNSDecoder(group: eventLoopGroup)
     }
 }
 

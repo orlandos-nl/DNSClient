@@ -32,6 +32,10 @@ extension DNSClient {
             return group.next().makeFailedFuture(error)
         }
     }
+    
+    public static func initializeChannel(_ channel: Channel, context: DNSClientContext) -> EventLoopFuture<Void> {
+        return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
+    }
 
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
