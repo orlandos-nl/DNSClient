@@ -19,11 +19,30 @@ let package = Package(
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
 //        .systemLibrary(name: "CResolv", path: "/usr/lib/resolv/"),
-        .target(
-            name: "DNSClient",
-            dependencies: ["NIO"]),
         .testTarget(
             name: "DNSClientTests",
             dependencies: ["DNSClient", "NIO"]),
     ]
+)
+
+#if canImport(Network)
+// 🔑
+package.dependencies.append(.package(path: "/Users/joannisorlandos/Projects/swift-nio-transport-services"))
+//package.dependencies.append(.package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.0.0"))
+let transport: Target.Dependency = "NIOTransportServices"
+package.platforms = [
+    .macOS(.v10_14),
+    .iOS(.v12),
+]
+#else
+// 🔑
+package.dependencies.append(.package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.0.0"))
+let transport: Target.Dependency = "NIOSSL"
+#endif
+
+package.targets.append(
+    .target(
+        name: "DNSClient",
+        dependencies: ["NIO", transport]
+    )
 )

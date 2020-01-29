@@ -70,3 +70,34 @@ fileprivate extension Array where Element == SocketAddress {
         return first(where: { $0.protocolFamily == PF_INET }) ?? first
     }
 }
+
+#if canImport(NIOTransportServices)
+import NIOTransportServices
+
+extension DNSClient {
+    public static func connectTS(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
+        guard let address = config.preferred else {
+            return group.next().makeFailedFuture(MissingNameservers())
+        }
+
+        let dnsDecoder = DNSDecoder(group: group)
+        
+        let ipv4 = address.protocolFamily == PF_INET
+        return NIOTSDatagramBootstrap(group: group)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelInitializer { channel in
+                return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+        }.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel -> DNSClient in
+            let client = DNSClient(
+                channel: channel,
+                address: address,
+                decoder: dnsDecoder
+            )
+
+            dnsDecoder.mainClient = client
+            return client
+        }
+    }
+}
+#endif
