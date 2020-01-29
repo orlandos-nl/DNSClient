@@ -1,5 +1,17 @@
 import NIO
 
+final class EnvelopeInboundChannel: ChannelInboundHandler {
+    typealias InboundIn = AddressedEnvelope<ByteBuffer>
+    typealias InboundOut = ByteBuffer
+    
+    init() {}
+    
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let buffer = unwrapInboundIn(data).data
+        context.fireChannelRead(wrapInboundOut(buffer))
+    }
+}
+
 final class DNSDecoder: ChannelInboundHandler {
     let group: EventLoopGroup
     var messageCache = [UInt16: SentQuery]()
@@ -10,12 +22,12 @@ final class DNSDecoder: ChannelInboundHandler {
         self.group = group
     }
 
-    public typealias InboundIn = AddressedEnvelope<ByteBuffer>
-    public typealias OutboundOut = AddressedEnvelope<ByteBuffer>
+    public typealias InboundIn = ByteBuffer
+    public typealias OutboundOut = Never
     
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let envelope = self.unwrapInboundIn(data)
-        var buffer = envelope.data
+        var buffer = envelope
 
         guard let header = buffer.readHeader() else {
             context.fireErrorCaught(ProtocolError())

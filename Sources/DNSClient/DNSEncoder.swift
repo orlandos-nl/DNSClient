@@ -1,6 +1,6 @@
 import NIO
 
-final class EnvelopeChannel: ChannelOutboundHandler {
+final class EnvelopeOutboundChannel: ChannelOutboundHandler {
     typealias OutboundIn = ByteBuffer
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
     
