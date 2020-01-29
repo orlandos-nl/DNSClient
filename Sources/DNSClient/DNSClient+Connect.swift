@@ -56,7 +56,7 @@ extension DNSClient {
         }
 
         let ipv4 = address.protocolFamily == PF_INET
-        return bootstrap.bind(to: address).map { channel in
+        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
             let client = DNSClient(
                 channel: channel,
                 address: address,
@@ -93,7 +93,7 @@ extension DNSClient {
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
         }
-        .connect(host: ipv4 ? "0.0.0.0" : "::", port: 0)
+        .connect(to: address)
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
