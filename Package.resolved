@@ -15,7 +15,7 @@
         "repositoryURL": "https://github.com/joannis/swift-nio-transport-services.git",
         "state": {
           "branch": "feature/udp-support",
-          "revision": "8382bd6e859f748a38940c2514a91fe38458a4d0",
+          "revision": "210a59658f0339649a1837f9f7ace22c6482f65e",
           "version": null
         }
       }

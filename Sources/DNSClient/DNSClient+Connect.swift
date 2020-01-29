@@ -88,7 +88,9 @@ extension DNSClient {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
-        }.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel -> DNSClient in
+        }
+        .connect(host: ipv4 ? "0.0.0.0" : "::", port: 0)
+        .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
                 address: address,
