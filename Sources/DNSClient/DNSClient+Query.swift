@@ -97,7 +97,7 @@ extension DNSClient {
         let promise: EventLoopPromise<Message> = loop.makePromise()
         dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
         
-        channel.writeAndFlush(AddressedEnvelope(remoteAddress: address ?? primaryAddress, data: message), promise: nil)
+        channel.writeAndFlush(message, promise: nil)
         
         struct DNSTimeoutError: Error {}
         

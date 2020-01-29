@@ -1,17 +1,31 @@
 import NIO
 
-final class DNSEncoder: ChannelOutboundHandler {
-    typealias OutboundIn = AddressedEnvelope<Message>
+final class EnvelopeChannel: ChannelOutboundHandler {
+    typealias OutboundIn = ByteBuffer
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
     
-    init() {}
+    let address: SocketAddress
+    
+    init(address: SocketAddress) {
+        self.address = address
+    }
+    
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let buffer = unwrapOutboundIn(data)
+        let envelope = AddressedEnvelope(remoteAddress: address, data: buffer)
+        context.write(wrapOutboundOut(envelope), promise: promise)
+    }
+}
+
+final class DNSEncoder: ChannelOutboundHandler {
+    typealias OutboundIn = Message
+    typealias OutboundOut = ByteBuffer
     
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         let message = unwrapOutboundIn(data)
-        let data = DNSEncoder.encodeMessage(message.data, allocator: context.channel.allocator)
+        let data = DNSEncoder.encodeMessage(message, allocator: context.channel.allocator)
 
-        let envelope = AddressedEnvelope(remoteAddress: message.remoteAddress, data: data)
-        context.write(wrapOutboundOut(envelope), promise: promise)
+        context.write(wrapOutboundOut(data), promise: promise)
     }
     
     static func encodeMessage(_ message: Message, allocator: ByteBufferAllocator) -> ByteBuffer {
