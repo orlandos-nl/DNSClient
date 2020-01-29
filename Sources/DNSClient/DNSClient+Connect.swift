@@ -99,5 +99,20 @@ extension DNSClient {
             return client
         }
     }
+    /// Connect to the dns server
+    ///
+    /// - parameters:
+    ///     - group: EventLoops to use
+    /// - returns: Future with the NioDNS client
+    public static func connectTS(on group: NIOTSEventLoopGroup) -> EventLoopFuture<DNSClient> {
+        do {
+            let configString = try String(contentsOfFile: "/etc/resolv.conf")
+            let config = try ResolvConf(from: configString)
+
+            return connectTS(on: group, config: config.nameservers)
+        } catch {
+            return group.next().makeFailedFuture(UnableToParseConfig())
+        }
+    }
 }
 #endif
