@@ -21,8 +21,6 @@ let package = Package(
         .testTarget(
             name: "DNSClientTests",
             dependencies: ["DNSClient", "NIO"]),
-    ],
-    targets: [
         .target(
             name: "DNSClient",
             dependencies: ["NIO"]
