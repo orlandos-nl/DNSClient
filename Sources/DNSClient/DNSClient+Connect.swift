@@ -76,7 +76,7 @@ fileprivate extension Array where Element == SocketAddress {
     }
 }
 
-#if canImport(NIOTransportServices)
+#if canImport(NIOTransportServices) && os(iOS)
 import NIOTransportServices
 
 extension DNSClient {

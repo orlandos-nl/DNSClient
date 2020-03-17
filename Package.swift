@@ -26,7 +26,7 @@ let package = Package(
 )
 
 // iOS needs my fork for UDP support until the PR is merged
-#if canImport(Network) && os(iOS)
+#if canImport(Network)
 package.dependencies.append(.package(url: "https://github.com/joannis/swift-nio-transport-services.git", .revision("feature/udp-networking-framework-support")))
 let transport: Target.Dependency = "NIOTransportServices"
 package.platforms = [
