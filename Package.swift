@@ -18,34 +18,14 @@ let package = Package(
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
-//        .systemLibrary(name: "CResolv", path: "/usr/lib/resolv/"),
         .testTarget(
             name: "DNSClientTests",
             dependencies: ["DNSClient", "NIO"]),
+    ],
+    targets: [
+        .target(
+            name: "DNSClient",
+            dependencies: ["NIO"]
+        )
     ]
 )
-
-// iOS needs my fork for UDP support until the PR is merged
-#if canImport(Network)
-package.dependencies.append(.package(url: "https://github.com/joannis/swift-nio-transport-services.git", .revision("feature/udp-networking-framework-support")))
-let transport: Target.Dependency = "NIOTransportServices"
-package.platforms = [
-    .macOS(.v10_14),
-    .iOS(.v12),
-]
-
-package.targets.append(
-    .target(
-        name: "DNSClient",
-        dependencies: ["NIO", transport]
-    )
-)
-
-#else
-package.targets.append(
-    .target(
-        name: "DNSClient",
-        dependencies: ["NIO"]
-    )
-)
-#endif
