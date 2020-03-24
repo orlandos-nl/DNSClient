@@ -51,8 +51,8 @@ extension DNSClient {
                 return channel.pipeline.addHandlers(
                     EnvelopeInboundChannel(),
                     dnsDecoder,
-                    DNSEncoder(),
-                    EnvelopeOutboundChannel(address: address)
+                    EnvelopeOutboundChannel(address: address),
+                    DNSEncoder()
                 )
         }
 
@@ -79,6 +79,7 @@ fileprivate extension Array where Element == SocketAddress {
 #if canImport(NIOTransportServices) && os(iOS)
 import NIOTransportServices
 
+@available(iOS 12, *)
 extension DNSClient {
     public static func connectTS(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
