@@ -82,10 +82,27 @@ public enum Record {
 
 public struct TXTRecord: DNSResource {
     public let text: String
+    public let key: String
+    public let value: String
+    
+    init?(text: String) {
+        let parts = text.split(separator: "=")
+        
+        if parts.count != 2 {
+            return nil
+        }
+        
+        self.text = text
+        self.key = String(parts[0])
+        self.value = String(parts[1])
+    }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> TXTRecord? {
-        guard let labels = buffer.readLabels() else { return nil }
-        return TXTRecord(text: labels.string)
+        guard let string = buffer.readString(length: length) else {
+            return nil
+        }
+        
+        return TXTRecord(text: string)
     }
 }
 

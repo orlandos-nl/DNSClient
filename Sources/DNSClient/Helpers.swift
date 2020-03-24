@@ -108,6 +108,16 @@ extension ByteBuffer {
             else {
                 return nil
         }
+        
+        let newIndex = readerIndex + Int(dataLength)
+        
+        guard newIndex <= writerIndex else {
+            return nil
+        }
+        
+        defer {
+            moveReaderIndex(to: newIndex)
+        }
 
         func make<Resource>(_ resource: Resource.Type) -> ResourceRecord<Resource>? {
             guard let resource = Resource.read(from: &self, length: Int(dataLength)) else {
@@ -157,7 +167,10 @@ extension ByteBuffer {
             break
         }
 
-        guard let other = make(ByteBuffer.self) else { return nil }
+        guard let other = make(ByteBuffer.self) else {
+            return nil
+        }
+        
         return .other(other)
     }
 

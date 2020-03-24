@@ -33,8 +33,17 @@ extension DNSClient {
         }
     }
     
-    public static func initializeChannel(_ channel: Channel, context: DNSClientContext) -> EventLoopFuture<Void> {
-        return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
+    public static func initializeChannel(_ channel: Channel, context: DNSClientContext, asEnvelopeTo remoteAddress: SocketAddress? = nil) -> EventLoopFuture<Void> {
+        if let remoteAddress = remoteAddress {
+            return channel.pipeline.addHandlers(
+                EnvelopeInboundChannel(),
+                context.decoder,
+                EnvelopeOutboundChannel(address: remoteAddress),
+                DNSEncoder()
+            )
+        } else {
+            return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
+        }
     }
 
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
