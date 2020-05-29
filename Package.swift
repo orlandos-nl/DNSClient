@@ -1,4 +1,4 @@
-// swift-tools-version:5.2
+// swift-tools-version:5.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
     name: "DNSClient",
     platforms: [
-        .macOS(.v10_15),
-        .iOS(.v13),
+        .macOS(.v10_14),
+        .iOS(.v12),
     ],
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
@@ -25,10 +25,8 @@ let package = Package(
 //        .systemLibrary(name: "CResolv", path: "/usr/lib/resolv/"),
         .testTarget(
             name: "DNSClientTests",
-            dependencies: [
-                .target(name: "DNSClient"),
-                .product(name: "NIO", package: "swift-nio"),
-        ]),
+            dependencies: ["DNSClient", "NIO"]
+        )
     ]
 )
 
@@ -38,10 +36,7 @@ package.dependencies.append(.package(url: "https://github.com/joannis/swift-nio-
 package.targets.append(
     .target(
         name: "DNSClient",
-        dependencies: [
-            .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-            .product(name: "NIO", package: "swift-nio"),
-        ]
+        dependencies: ["NIO", "NIOTransportServices"]
     )
 )
 
@@ -49,9 +44,7 @@ package.targets.append(
 package.targets.append(
     .target(
         name: "DNSClient",
-        dependencies: [
-            .product(name: "NIO", package: "swift-nio"),
-        ]
+        dependencies: ["NIO"]
     )
 )
 #endif
