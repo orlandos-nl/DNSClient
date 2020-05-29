@@ -25,22 +25,23 @@ let package = Package(
 //        .systemLibrary(name: "CResolv", path: "/usr/lib/resolv/"),
         .testTarget(
             name: "DNSClientTests",
-            dependencies: ["DNSClient", "NIO"]),
+            dependencies: [
+                .target(name: "DNSClient"),
+                .product(name: "NIO", package: "swift-nio"),
+        ]),
     ]
 )
 
 #if canImport(Network)
 package.dependencies.append(.package(url: "https://github.com/joannis/swift-nio-transport-services.git", .revision("feature/udp-networking-framework-support")))
-let transport: Target.Dependency = "NIOTransportServices"
-package.platforms = [
-    .macOS(.v10_14),
-    .iOS(.v12),
-]
 
 package.targets.append(
     .target(
         name: "DNSClient",
-        dependencies: ["NIO", transport]
+        dependencies: [
+            .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+            .product(name: "NIO", package: "swift-nio"),
+        ]
     )
 )
 
@@ -48,7 +49,9 @@ package.targets.append(
 package.targets.append(
     .target(
         name: "DNSClient",
-        dependencies: ["NIO"]
+        dependencies: [
+            .product(name: "NIO", package: "swift-nio"),
+        ]
     )
 )
 #endif
