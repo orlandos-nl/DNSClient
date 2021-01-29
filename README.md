@@ -16,7 +16,12 @@ And to your target:
 
 ### Usage 🤯
 
-Connect to a DNS Server
+Connect to your default DNS Server:
+```swift
+let client = try DNSClient.connect(on: loop).wait()
+```
+
+Connect to a specific DNS Server:
 ```swift
 let googleDNS = SocketAddress(ipAddress: "8.8.8.8", port: 53)
 let client = try DNSClient.connect(on: loop, config: [googleDNS]).wait()
