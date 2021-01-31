@@ -41,6 +41,18 @@ let records = try client.sendQuery(forHost: "example.com", type: .txt).wait()
 
 Need I say more?
 
+### Notes
+
+The DNS Client doesn't retain itself during requests. This means that you cannot do the following:
+
+```swift
+DNSClient.connect(on: request.eventLoop).flatMap { client in
+    // client.doQueryStuff()
+}
+```
+
+The client will deallocate itself, resulting in a timeout. Make sure that the `client` is strongly referenced, either until all results are in or by setting it on a shared context. In Vapor, that can be the request's `storage` container. On other services, you could consider a global, ThreadSpecificVariable or a property on your class.
+
 ### Featured In 🛍
 
 - [MongoKitten](https://github.com/openkitten/mongokitten)
