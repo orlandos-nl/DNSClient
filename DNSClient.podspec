@@ -16,9 +16,8 @@ Pod::Spec.new do |spec|
   #
 
   spec.name         = "DNSClient"
-  spec.version      = "2.0.8"
+  spec.version      = "2.0.7"
   spec.summary      = "Async DNS resolution, with all the DNS features you need!"
-  
   spec.homepage     = "https://github.com/OpenKitten/NioDNS"
 
 
@@ -42,7 +41,7 @@ Pod::Spec.new do |spec|
   #  profile URL.
   #
 
-  spec.authors            = { "Prerak Sola" => "prerak.sola@zeetim.com" }
+  spec.authors            = { "Joannis Orlandos" => "joannis@orlandos.nl" }
 
   # ――― Platform Specifics ――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
   #
@@ -54,7 +53,7 @@ Pod::Spec.new do |spec|
   spec.ios.deployment_target = '10.0'
   spec.swift_version = '4.0'  
 
-# ――― Source Location ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
+  # ――― Source Location ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
   #
   #  Specify the location from where the source should be retrieved.
   #  Supports git, hg, bzr, svn and HTTP.
