@@ -65,7 +65,8 @@ extension DNSClient {
                 )
         }
 
-        let ipv4 = address.protocolFamily == PF_INET
+		let ipv4 = address.protocol.rawValue == PF_INET
+		
         return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
             let client = DNSClient(
                 channel: channel,
@@ -81,7 +82,7 @@ extension DNSClient {
 
 fileprivate extension Array where Element == SocketAddress {
     var preferred: SocketAddress? {
-        return first(where: { $0.protocolFamily == PF_INET }) ?? first
+		return first(where: { $0.protocol.rawValue == PF_INET }) ?? first
     }
 }
 
