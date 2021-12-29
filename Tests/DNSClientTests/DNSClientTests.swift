@@ -35,6 +35,23 @@ final class DNSClientTests: XCTestCase {
         let answers = try dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net").wait()
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
     }
+    
+    func testSRVRecordsAsyncRequest() throws {
+        let expectation = self.expectation(description: "getSRVRecords")
+
+        dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net")
+        .whenComplete { (result) in
+            switch result {
+            case .failure(let error):
+                XCTFail("\(error)")
+            case .success(let answers):
+                print(answers)
+                XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+            }
+            expectation.fulfill()
+        }
+        self.waitForExpectations(timeout: 5, handler: nil)
+    }
 
     static var allTests = [
         ("testAQuery", testAQuery),
