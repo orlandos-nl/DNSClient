@@ -120,7 +120,7 @@ public struct ARecord: DNSResource {
     public var stringAddress: String {
         return withUnsafeBytes(of: address) { buffer in
             let buffer = buffer.bindMemory(to: UInt8.self)
-            return "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
+            return "\(buffer[3]).\(buffer[2]).\(buffer[1]).\(buffer[0])"
         }
     }
 
