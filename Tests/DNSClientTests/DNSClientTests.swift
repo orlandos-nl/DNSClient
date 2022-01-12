@@ -15,6 +15,17 @@ final class DNSClientTests: XCTestCase {
             XCTFail("\(error)")
         }
     }
+    
+    func testStringAddress() throws {
+        var buffer = ByteBuffer()
+        buffer.writeInteger(0x7F000001 as UInt32)
+        guard let record = ARecord.read(from: &buffer, length: buffer.readableBytes) else {
+            XCTFail()
+            return
+        }
+        
+        XCTAssertEqual(record.stringAddress, "127.0.0.1")
+    }
 
     func testAQuery() throws {
         let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
