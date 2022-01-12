@@ -81,28 +81,37 @@ public enum Record {
 }
 
 public struct TXTRecord: DNSResource {
-    public let text: String
-    public let key: String
-    public let value: String
     
-    init?(text: String) {
-        let parts = text.split(separator: "=")
-        
-        if parts.count != 2 {
-            return nil
-        }
-        
-        self.text = text
-        self.key = String(parts[0])
-        self.value = String(parts[1])
+    public let values: [String: String]
+    
+    init(values: [String: String]) {
+        self.values = values
     }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> TXTRecord? {
-        guard let string = buffer.readString(length: length) else {
-            return nil
+        var currentIndex = 0
+        var components: [String: String] = [:]
+        
+        while currentIndex < length {
+            guard let componentLenght = buffer.readInteger(endianness: .big, as: UInt8.self) else {
+                return nil
+            }
+            
+            guard let componentString = buffer.readString(length: Int(componentLenght)) else {
+                return nil
+            }
+            
+            let parts = componentString.split(separator: "=")
+            
+            if parts.count != 2 {
+                return nil
+            }
+            
+            components[String(parts[0])] = String(parts[1])
+            currentIndex += (Int(componentLenght) + 1)
         }
         
-        return TXTRecord(text: string)
+        return TXTRecord(values: components)
     }
 }
 
@@ -111,7 +120,7 @@ public struct ARecord: DNSResource {
     public var stringAddress: String {
         return withUnsafeBytes(of: address) { buffer in
             let buffer = buffer.bindMemory(to: UInt8.self)
-            return "\(buffer[0]).\(buffer[1]).\(buffer[2]).\(buffer[3])"
+            return "\(buffer[3]).\(buffer[2]).\(buffer[1]).\(buffer[0])"
         }
     }
 

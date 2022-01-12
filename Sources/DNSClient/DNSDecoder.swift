@@ -60,12 +60,16 @@ final class DNSDecoder: ChannelInboundHandler {
         }
 
         do {
+            let answers = try resourceRecords(count: header.answerCount)
+            let authorities = try resourceRecords(count: header.authorityCount)
+            let additionalData = try resourceRecords(count: header.additionalRecordCount)
+            
             let message = Message(
                 header: header,
                 questions: questions,
-                answers: try resourceRecords(count: header.answerCount),
-                authorities: try resourceRecords(count: header.authorityCount),
-                additionalData: try resourceRecords(count: header.additionalRecordCount)
+                answers: answers,
+                authorities: authorities,
+                additionalData: additionalData
             )
 
             guard let query = messageCache[header.id] else {
