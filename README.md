@@ -2,6 +2,8 @@
 
 Async DNS resolution, with all the DNS features you need!
 
+[Join our Discord](https://discord.gg/H6799jh) for any questions and friendly banter.
+
 ### Installation 💥
 
 Add the package:
