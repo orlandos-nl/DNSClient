@@ -6,18 +6,13 @@ final class DNSClientTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
     var dnsClient: DNSClient!
 
-    override func setUp() {
+    override func setUp() async throws {
         super.setUp()
-        do {
-            group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-            dnsClient = try DNSClient.connect(on: group, host: "8.8.8.8").wait()
-        } catch let error {
-            XCTFail("\(error)")
-        }
+        dnsClient = try await DNSClient()
     }
     
     func testStringAddress() throws {
-        var buffer = ByteBuffer()
+        var buffer = ByteBufferAllocator().buffer(capacity: 4)
         buffer.writeInteger(0x7F000001 as UInt32)
         guard let record = ARecord.read(from: &buffer, length: buffer.readableBytes) else {
             XCTFail()
