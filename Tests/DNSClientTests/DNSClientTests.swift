@@ -7,7 +7,7 @@ final class DNSClientTests: XCTestCase {
     var dnsClient: DNSClient!
 
     override func setUp() async throws {
-        super.setUp()
+        try await super.setUp()
         dnsClient = try await DNSClient()
     }
     
