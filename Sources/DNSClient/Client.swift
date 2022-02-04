@@ -1,3 +1,4 @@
+import Dispatch
 import NIO
 
 public final class DNSClient: Resolver {
@@ -23,15 +24,18 @@ public final class DNSClient: Resolver {
     }
 
     deinit {
-        _ = channel.close(mode: .all)
+        // This can crash the codebase if de-inited due t a failed UDP connection
+        DispatchQueue.main.async { [channel] in
+            _ = channel.close(mode: .all)
+        }
     }
 }
 
 public struct DNSClientContext {
     internal let decoder: DNSDecoder
     
-    public init(eventLoopGroup: EventLoopGroup) {
-        self.decoder = DNSDecoder(group: eventLoopGroup)
+    public init() {
+        self.decoder = DNSDecoder()
     }
 }
 

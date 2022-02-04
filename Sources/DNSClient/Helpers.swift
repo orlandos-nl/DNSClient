@@ -108,6 +108,16 @@ extension ByteBuffer {
             else {
                 return nil
         }
+        
+        let newIndex = readerIndex + Int(dataLength)
+        
+        guard newIndex <= writerIndex else {
+            return nil
+        }
+        
+        defer {
+            moveReaderIndex(to: newIndex)
+        }
 
         func make<Resource>(_ resource: Resource.Type) -> ResourceRecord<Resource>? {
             guard let resource = Resource.read(from: &self, length: Int(dataLength)) else {
@@ -157,31 +167,10 @@ extension ByteBuffer {
             break
         }
 
-        guard let other = make(ByteBuffer.self) else { return nil }
-        return .other(other)
-    }
-
-    mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
-        guard
-            let labels = readLabels(),
-            let typeNumber = readInteger(endianness: .big, as: UInt16.self),
-            let classNumber = readInteger(endianness: .big, as: UInt16.self),
-            let ttl = readInteger(endianness: .big, as: UInt32.self),
-            let dataLength = readInteger(endianness: .big, as: UInt16.self),
-            let resource = ByteBuffer.read(from: &self, length: Int(dataLength))
-            else {
-                return nil
+        guard let other = make(ByteBuffer.self) else {
+            return nil
         }
-
-        let record = ResourceRecord(
-            domainName: labels,
-            dataType: typeNumber,
-            dataClass: classNumber,
-            ttl: ttl,
-            resource: resource
-        )
-
-        self.moveReaderIndex(forwardBy: Int(dataLength))
-        return record
+        
+        return .other(other)
     }
 }
