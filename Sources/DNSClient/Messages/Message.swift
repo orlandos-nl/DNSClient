@@ -133,7 +133,7 @@ public struct ARecord: DNSResource {
 public struct AAAARecord: DNSResource {
     public let address: [UInt8]
     public var stringAddress: String {
-        String(format: "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+        String(format: "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
                address[0], address[1], address[2], address[3],
                address[4], address[5], address[6], address[7],
                address[8], address[9], address[10], address[11],
