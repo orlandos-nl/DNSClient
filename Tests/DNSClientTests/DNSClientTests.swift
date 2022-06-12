@@ -27,6 +27,18 @@ final class DNSClientTests: XCTestCase {
         XCTAssertEqual(record.stringAddress, "127.0.0.1")
     }
 
+    func testStringAddressAAAA() throws {
+        var buffer = ByteBuffer()
+        buffer.writeBytes([0x2a, 0x00, 0x14, 0x50, 0x40, 0x01, 0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x0e] as [UInt8])
+
+        guard let record = AAAARecord.read(from: &buffer, length: buffer.readableBytes) else {
+            XCTFail()
+            return
+        }
+
+        XCTAssertEqual(record.stringAddress, "2a00:1450:4001:0809:0000:0000:0000:200e")
+    }
+
     func testAQuery() throws {
         let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
         XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
