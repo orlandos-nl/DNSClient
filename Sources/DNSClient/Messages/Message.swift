@@ -132,9 +132,14 @@ public struct ARecord: DNSResource {
 
 public struct AAAARecord: DNSResource {
     public let address: [UInt8]
-//    public var stringAddress: String {
-//        // TODO
-//    }
+    public var stringAddress: String {
+        String(format: "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+               address[0], address[1], address[2], address[3],
+               address[4], address[5], address[6], address[7],
+               address[8], address[9], address[10], address[11],
+               address[12], address[13], address[14], address[15]
+        )
+    }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> AAAARecord? {
         guard let address = buffer.readBytes(length: 16) else { return nil }
