@@ -163,6 +163,12 @@ extension ByteBuffer {
             }
 
             return .srv(srv)
+        case .mx:
+            guard let mx = make(MXRecord.self) else {
+                return nil
+            }
+
+            return .mx(mx)
         default:
             break
         }
