@@ -1,6 +1,6 @@
 import NIO
 
-fileprivate let nameserverPrefix = "nameserver "
+fileprivate let nameserverPrefix = "nameserver"
 
 struct ResolvConf {
     let nameservers: [SocketAddress]
@@ -15,7 +15,13 @@ struct ResolvConf {
             }
 
             line.removeFirst(nameserverPrefix.count)
-            try nameservers.append(SocketAddress(ipAddress: String(line), port: 53))
+            let ipAddress = line.drop(while: { $0 == " " || $0 == "\t" })
+            guard ipAddress.startIndex != line.startIndex else {
+                // There should be at least one separator character
+                continue nextLine
+            }
+
+            try nameservers.append(SocketAddress(ipAddress: String(ipAddress), port: 53))
         }
 
         self.nameservers = nameservers
