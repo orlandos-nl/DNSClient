@@ -2,7 +2,7 @@ import XCTest
 import NIO
 import DNSClient
 
-final class DNSClientTests: XCTestCase {
+final class DNSUDPClientTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
     var dnsClient: DNSClient!
 
@@ -49,9 +49,11 @@ final class DNSClientTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
     }
 
-    func testSendQuery() throws {
-        let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
-        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    func testSendTxtQuery() throws {
+        try XCTExpectFailure {
+            let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
+            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+        }
     }
 
     func testSendQueryMX() throws {
@@ -80,11 +82,4 @@ final class DNSClientTests: XCTestCase {
         }
         self.waitForExpectations(timeout: 5, handler: nil)
     }
-
-    static var allTests = [
-        ("testAQuery", testAQuery),
-        ("testAAAAQuery", testAAAAQuery),
-        ("testSendQuery", testSendQuery),
-        ("testSRVRecords", testSRVRecords),
-    ]
 }

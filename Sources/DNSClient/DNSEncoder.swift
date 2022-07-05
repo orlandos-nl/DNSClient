@@ -17,6 +17,36 @@ final class EnvelopeOutboundChannel: ChannelOutboundHandler {
     }
 }
 
+final class UInt16FrameDecoder: ByteToMessageDecoder {
+    typealias InboundOut = ByteBuffer
+    
+    func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
+        var readBuffer = buffer
+        guard
+            let size: UInt16 = buffer.readInteger(),
+            let slice = buffer.readSlice(length: Int(size))
+        else {
+            return .needMoreData
+        }
+        
+        buffer = readBuffer
+        context.fireChannelRead(wrapInboundOut(slice))
+        return .continue
+    }
+    
+    func decodeLast(context: ChannelHandlerContext, buffer: inout ByteBuffer, seenEOF: Bool) throws -> DecodingState {
+        try decode(context: context, buffer: &buffer)
+    }
+}
+
+final class UInt16FrameEncoder: MessageToByteEncoder {
+    func encode(data: ByteBuffer, out: inout ByteBuffer) throws {
+        try out.writeLengthPrefixed(as: UInt16.self) { out in
+            out.writeImmutableBuffer(data)
+        }
+    }
+}
+
 final class DNSEncoder: ChannelOutboundHandler {
     typealias OutboundIn = Message
     typealias OutboundOut = ByteBuffer
