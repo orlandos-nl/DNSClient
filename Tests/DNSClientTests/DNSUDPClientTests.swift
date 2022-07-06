@@ -50,10 +50,8 @@ final class DNSUDPClientTests: XCTestCase {
     }
 
     func testSendTxtQuery() throws {
-        try XCTExpectFailure {
-            let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
-        }
+        let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
+        XCTAssertEqual(result.header.answerCount, 0, "The returned answers should be 0 on UDP")
     }
 
     func testSendQueryMX() throws {
