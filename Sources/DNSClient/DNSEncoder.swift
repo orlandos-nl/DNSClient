@@ -21,15 +21,12 @@ final class UInt16FrameDecoder: ByteToMessageDecoder {
     typealias InboundOut = ByteBuffer
     
     func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
-        var readBuffer = buffer
         guard
             let size: UInt16 = buffer.readInteger(),
             let slice = buffer.readSlice(length: Int(size))
         else {
             return .needMoreData
         }
-        
-        buffer = readBuffer
         context.fireChannelRead(wrapInboundOut(slice))
         return .continue
     }
