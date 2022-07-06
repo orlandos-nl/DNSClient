@@ -23,13 +23,13 @@ final class UInt16FrameDecoder: ByteToMessageDecoder {
     func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
         var readBuffer = buffer
         guard
-            let size: UInt16 = buffer.readInteger(),
-            let slice = buffer.readSlice(length: Int(size))
+            let size: UInt16 = readBuffer.readInteger(),
+            let slice = readBuffer.readSlice(length: Int(size))
         else {
             return .needMoreData
         }
         
-        buffer = readBuffer
+        buffer.moveReaderIndex(to: readBuffer.readerIndex)
         context.fireChannelRead(wrapInboundOut(slice))
         return .continue
     }

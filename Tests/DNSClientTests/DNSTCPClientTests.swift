@@ -80,4 +80,13 @@ final class DNSTCPClientTests: XCTestCase {
             }
         self.waitForExpectations(timeout: 5, handler: nil)
     }
+    
+    func testAll() throws {
+        try testSRVRecords()
+        try testSRVRecordsAsyncRequest()
+        try testSendQueryMX()
+        try testSendTxtQuery()
+        try testAQuery()
+        try testAAAAQuery()
+    }
 }
