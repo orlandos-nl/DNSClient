@@ -4,3 +4,4 @@ struct CancelError: Error {}
 struct AuthorityNotFound: Error {}
 struct ProtocolError: Error {}
 struct UnknownQuery: Error {}
+struct ConnectionClosed: Error {}
