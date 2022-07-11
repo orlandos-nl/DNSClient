@@ -24,9 +24,9 @@ extension DNSClient {
     ///     - group: EventLoops to use
     ///     - host: DNS host to connect to
     /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup, host: String) -> EventLoopFuture<DNSClient> {
+    public static func connect(on group: EventLoopGroup, host: String, port: Int = 53) -> EventLoopFuture<DNSClient> {
         do {
-            let address = try SocketAddress(ipAddress: host, port: 53)
+            let address = try SocketAddress(ipAddress: host, port: port)
             return connect(on: group, config: [address])
         } catch {
             return group.next().makeFailedFuture(error)
@@ -55,9 +55,9 @@ extension DNSClient {
     ///     - group: EventLoops to use
     ///     - host: DNS host to connect to
     /// - returns: Future with the NioDNS client
-    public static func connectTCP(on group: EventLoopGroup, host: String) -> EventLoopFuture<DNSClient> {
+    public static func connectTCP(on group: EventLoopGroup, host: String, port: Int = 53) -> EventLoopFuture<DNSClient> {
         do {
-            let address = try SocketAddress(ipAddress: host, port: 53)
+            let address = try SocketAddress(ipAddress: host, port: port)
             return connectTCP(on: group, config: [address])
         } catch {
             return group.next().makeFailedFuture(error)

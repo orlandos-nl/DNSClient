@@ -4,7 +4,7 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     /// A list of currently open connections
     ///
     /// This is not thread safe outside of the cluster's eventloop
-    private var pool: [PooledConnection]
+    internal var pool: [PooledConnection]
     public let eventLoop: EventLoop
     
     /// If `true`, no connections will be opened and all existing connections will be shut down
@@ -12,7 +12,7 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     /// This is not thread safe outside of the cluster's eventloop
     private var isClosed = false
     
-    init(on eventLoop: EventLoop) {
+    public init(on eventLoop: EventLoop) {
         self.eventLoop = eventLoop
         self.pool = []
     }
@@ -55,9 +55,9 @@ public final class MultipleConnectionPool: DNSConnectionPool {
             return eventLoop.makeFailedFuture(ConnectionClosed())
         }
         
-        let connectMethod = requirements.protocolPreference == .tcp ? DNSClient.connectTCP(on:config:) : DNSClient.connect(on:config:)
+        let connectMethod = requirements.protocolPreference == .tcp ? DNSClient.connectTCP(on:host:port:) : DNSClient.connect(on:host:port:)
         
-        return connectMethod(eventLoop, [requirements.host]).map { connection in
+        return connectMethod(eventLoop, requirements.host, requirements.port).map { connection in
             connection.channel.closeFuture.whenComplete { [weak self, connection] _ in
                 guard let me = self else { return }
                 me.remove(connection: connection)
@@ -69,15 +69,20 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     }
     
     private func getConnection(for requirements: ConnectionRequirements) -> EventLoopFuture<PooledConnection> {
-        if let foundConnection = findExistingConnection(for: requirements) {
-            return self.eventLoop.makeSucceededFuture(foundConnection)
+        do {
+            if let foundConnection = try findExistingConnection(for: requirements) {
+                return self.eventLoop.makeSucceededFuture(foundConnection)
+            }
+            return self.createPooledConnection(for: requirements)
+        } catch {
+            return eventLoop.makeFailedFuture(error)
         }
-        return self.createPooledConnection(for: requirements)
     }
     
-    private func findExistingConnection(for requirements: ConnectionRequirements) -> PooledConnection? {
+    private func findExistingConnection(for requirements: ConnectionRequirements) throws -> PooledConnection? {
+        let address = try SocketAddress(ipAddress: requirements.host, port: requirements.port)
         return pool.first { connection in
-            connection.connection.primaryAddress == requirements.host && connection.connectionType == requirements.protocolPreference
+            connection.connection.primaryAddress == address && connection.connectionType == requirements.protocolPreference
         }
     }
             
@@ -102,7 +107,7 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     }
 }
 
-fileprivate struct PooledConnection {
+struct PooledConnection {
     let connection: DNSClient
     let connectionType: ConnectionRequirements.ConnectionType
 }

@@ -11,12 +11,14 @@ public struct ConnectionRequirements: Hashable {
     
     var sourcingPreference: SourcingPreference
     var protocolPreference: ConnectionType
-    var host: SocketAddress
+    var host: String
+    var port: Int
 
-    public init(sourcingPreference: SourcingPreference = .existing, protocolPreference: ConnectionType, host: SocketAddress) {
+    public init(sourcingPreference: SourcingPreference = .existing, protocolPreference: ConnectionType = .udp, host: String, port: Int = 53) {
         self.sourcingPreference = sourcingPreference
         self.protocolPreference = protocolPreference
         self.host = host
+        self.port = port
     }
 }
 
