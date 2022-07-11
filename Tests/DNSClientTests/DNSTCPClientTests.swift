@@ -1,6 +1,6 @@
 import XCTest
 import NIO
-import DNSClient
+@testable import DNSClient
 
 final class DNSTCPClientTests: XCTestCase {
     var group: MultiThreadedEventLoopGroup!
@@ -79,6 +79,22 @@ final class DNSTCPClientTests: XCTestCase {
                 expectation.fulfill()
             }
         self.waitForExpectations(timeout: 5, handler: nil)
+    }
+    
+    func testThreadSafety() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let client = try await DNSClient.connectTCP(
+            on: eventLoopGroup.next(),
+            host: "8.8.8.8"
+        ).get()
+        let hostname = "google.com"
+        async let result = client.initiateAAAAQuery(host: hostname, port: 0).get()
+        async let result2 = client.initiateAAAAQuery(host: hostname, port: 0).get()
+        async let result3 = client.initiateAAAAQuery(host: hostname, port: 0).get()
+        
+        _ = try await [result, result2, result3]
+        
+        try client.channel.close(mode: .all).wait()
     }
     
     func testAll() throws {

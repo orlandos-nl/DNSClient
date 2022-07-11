@@ -95,17 +95,19 @@ extension DNSClient {
 
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
         let promise: EventLoopPromise<Message> = loop.makePromise()
-        dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
         
-        channel.writeAndFlush(message, promise: nil)
-        
-        struct DNSTimeoutError: Error {}
-        
-        loop.scheduleTask(in: .seconds(30)) {
-            promise.fail(DNSTimeoutError())
-        }
+        return loop.flatSubmit {
+            self.dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
+            self.channel.writeAndFlush(message, promise: nil)
+            
+            struct DNSTimeoutError: Error {}
+            
+            self.loop.scheduleTask(in: .seconds(30)) {
+                promise.fail(DNSTimeoutError())
+            }
 
-        return promise.futureResult
+            return promise.futureResult
+        }
     }
 
     /// Request SRV records from a host
