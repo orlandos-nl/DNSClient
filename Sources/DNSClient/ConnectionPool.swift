@@ -4,15 +4,12 @@ public struct ConnectionRequirements: Hashable {
     public enum SourcingPreference {
         case new, existing, unpooled
     }
-    public enum ProtocolPreference {
-        case tcp, udp
-    }
     
     var sourcingPreference: SourcingPreference
-    var protocolPreference: ProtocolPreference
+    var protocolPreference: DNSClient.ConnectionType
     var host: SocketAddress
 
-    public init(sourcingPreference: SourcingPreference = .existing, protocolPreference: ProtocolPreference, host: SocketAddress) {
+    public init(sourcingPreference: SourcingPreference = .existing, protocolPreference: DNSClient.ConnectionType, host: SocketAddress) {
         self.sourcingPreference = sourcingPreference
         self.protocolPreference = protocolPreference
         self.host = host

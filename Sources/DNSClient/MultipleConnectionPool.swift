@@ -1,16 +1,20 @@
 import NIO
 
 public final class MultipleConnectionPool: DNSConnectionPool {
+    /// A list of currently open connections
+    ///
+    /// This is not thread safe outside of the cluster's eventloop
     private var pool: [DNSClient]
+    public let eventLoop: EventLoop
     
     /// If `true`, no connections will be opened and all existing connections will be shut down
+    ///
+    /// This is not thread safe outside of the cluster's eventloop
     private var isClosed = false
     
-    private var elg: EventLoopGroup
-    
-    init(on group: EventLoopGroup) {
+    init(on eventLoop: EventLoop) {
+        self.eventLoop = eventLoop
         self.pool = []
-        self.elg = group
     }
     
     public func next(for requirements: ConnectionRequirements) -> EventLoopFuture<DNSClient> {
@@ -20,7 +24,7 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     private func makeConnectionRecursively(for requirements: ConnectionRequirements, attempts: Int = 3) -> EventLoopFuture<DNSClient> {
         return makeConnection(for: requirements).flatMapError { error -> EventLoopFuture<DNSClient> in
             if attempts < 0 {
-                return self.elg.next().makeFailedFuture(error)
+                return self.eventLoop.makeFailedFuture(error)
             }
             
             return self.makeConnectionRecursively(for: requirements, attempts: attempts - 1)
@@ -48,12 +52,12 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     
     func createUnpooledConnection(for requirements: ConnectionRequirements) -> EventLoopFuture<DNSClient> {
         if isClosed {
-            return elg.next().makeFailedFuture(ConnectionClosed())
+            return eventLoop.makeFailedFuture(ConnectionClosed())
         }
         
         let connectMethod = requirements.protocolPreference == .tcp ? DNSClient.connectTCP(on:config:) : DNSClient.connect(on:config:)
         
-        return connectMethod(elg, [requirements.host]).map { connection in
+        return connectMethod(eventLoop, [requirements.host]).map { connection in
             connection.channel.closeFuture.whenComplete { [weak self, connection] _ in
                 guard let me = self else { return }
                 me.remove(connection: connection)
@@ -64,15 +68,14 @@ public final class MultipleConnectionPool: DNSConnectionPool {
     
     func getConnection(for requirements: ConnectionRequirements) -> EventLoopFuture<DNSClient> {
         if let foundConnection = findExistingConnection(for: requirements) {
-            return self.elg.next().makeSucceededFuture(foundConnection)
+            return self.eventLoop.makeSucceededFuture(foundConnection)
         }
         return self.createPooledConnection(for: requirements)
     }
     
     func findExistingConnection(for requirements: ConnectionRequirements) -> DNSClient? {
         return pool.first { connection in
-            connection.primaryAddress == requirements.host
-            // check protocol
+            connection.primaryAddress == requirements.host && connection.connectionType == requirements.protocolPreference
         }
     }
             
