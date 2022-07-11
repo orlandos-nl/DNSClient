@@ -102,8 +102,7 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder,
-                connectionType: .udp
+                decoder: dnsDecoder
             )
 
             dnsDecoder.mainClient = client
@@ -132,8 +131,7 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder,
-                connectionType: .tcp
+                decoder: dnsDecoder
             )
             
             dnsDecoder.mainClient = client

@@ -1,13 +1,8 @@
 import NIO
 
 public final class DNSClient: Resolver {
-    public enum ConnectionType {
-        case tcp, udp
-    }
-    
     let dnsDecoder: DNSDecoder
     let channel: Channel
-    let connectionType: ConnectionType
     let primaryAddress: SocketAddress
     var loop: EventLoop {
         return channel.eventLoop
@@ -15,22 +10,24 @@ public final class DNSClient: Resolver {
     // Each query has an ID to keep track of which response belongs to which query
     var messageID: UInt16 = 0
     
-    internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder, connectionType: ConnectionType) {
+    internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
         self.channel = channel
         self.primaryAddress = address
         self.dnsDecoder = decoder
-        self.connectionType = connectionType
     }
     
-    public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext, connectionType: ConnectionType = .udp) {
+    public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext) {
         self.channel = channel
         self.primaryAddress = dnsServerAddress
         self.dnsDecoder = context.decoder
-        self.connectionType = connectionType
     }
 
     deinit {
-        _ = channel.close(mode: .all)
+        _ = self.close()
+    }
+    
+    public func close() -> EventLoopFuture<Void> {
+        self.channel.close(mode: .all)
     }
 }
 
