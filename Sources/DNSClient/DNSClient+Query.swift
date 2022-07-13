@@ -35,8 +35,8 @@ extension DNSClient {
                 guard
                     case .aaaa(let record) = answer,
                     record.resource.address.count == 16
-                    else {
-                        return nil
+                else {
+                    return nil
                 }
 
                 let address = record.resource.address
@@ -78,19 +78,21 @@ extension DNSClient {
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
     public func sendQuery(forHost address: String, type: DNSResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
-        messageID = messageID &+ 1
-
-        var options: MessageOptions = [.standardQuery, .recursionDesired]
-        if let additionalOptions = additionalOptions {
-            options.insert(additionalOptions)
+        channel.eventLoop.flatSubmit {
+            self.messageID = self.messageID &+ 1
+            
+            var options: MessageOptions = [.standardQuery, .recursionDesired]
+            if let additionalOptions = additionalOptions {
+                options.insert(additionalOptions)
+            }
+            
+            let header = DNSMessageHeader(id: self.messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+            let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
+            let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
+            let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+            
+            return self.send(message)
         }
-
-        let header = DNSMessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-        let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
-        let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
-        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
-
-        return send(message)
     }
 
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {

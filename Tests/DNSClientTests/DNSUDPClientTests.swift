@@ -66,18 +66,30 @@ final class DNSUDPClientTests: XCTestCase {
     
     func testSRVRecordsAsyncRequest() throws {
         let expectation = self.expectation(description: "getSRVRecords")
-
+        
         dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net")
-        .whenComplete { (result) in
-            switch result {
-            case .failure(let error):
-                XCTFail("\(error)")
-            case .success(let answers):
-                print(answers)
-                XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+            .whenComplete { (result) in
+                switch result {
+                case .failure(let error):
+                    XCTFail("\(error)")
+                case .success(let answers):
+                    XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+                }
+                expectation.fulfill()
             }
-            expectation.fulfill()
-        }
         self.waitForExpectations(timeout: 5, handler: nil)
+    }
+    
+    func testSRVRecordsAsyncRequest2() async throws {
+        for _ in 0..<50 {
+            let answers = try await dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net").get()
+            XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+            for answer in answers {
+                let countA = try await dnsClient.initiateAAAAQuery(host: answer.resource.domainName.string, port: 27017).get().count
+                let countAAAA = try await dnsClient.initiateAQuery(host: answer.resource.domainName.string, port: 27017).get().count
+                
+                XCTAssertGreaterThan(countA + countAAAA, 0)
+            }
+        }
     }
 }
