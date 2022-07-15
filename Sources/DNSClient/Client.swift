@@ -1,37 +1,44 @@
 import NIO
 
 public final class DNSClient: Resolver {
-    let dnsDecoder: DNSDecoder
-    let channel: Channel
-    let primaryAddress: SocketAddress
-    var loop: EventLoop {
-        return channel.eventLoop
+    var messageCache = MessageCache()
+    let channelWrapper: GuaranteedAsyncValue<Channel, DNSClient>
+    var channel: Channel {
+        get async throws {
+            return try await channelWrapper.getValue(context: self)
+        }
     }
+    let primaryAddress: SocketAddress
+    let loop: EventLoop
     // Each query has an ID to keep track of which response belongs to which query
     var messageID: UInt16 = 0
     
-    internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
-        self.channel = channel
+    internal init(channelWrapper: GuaranteedAsyncValue<Channel, DNSClient>, address: SocketAddress, eventLoop: EventLoop) {
+        self.channelWrapper = channelWrapper
         self.primaryAddress = address
-        self.dnsDecoder = decoder
+        self.loop = eventLoop
     }
     
     public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext) {
-        self.channel = channel
+        self.channelWrapper = GuaranteedAsyncValue<Channel, DNSClient>(generator: { _ in channel }, precondition: { _, _ in true })
         self.primaryAddress = dnsServerAddress
-        self.dnsDecoder = context.decoder
+        self.loop = channel.eventLoop
     }
 
     deinit {
-        _ = channel.close(mode: .all)
+        Task {
+            _ = try await channel.close(mode: .all)
+        }
     }
 }
 
 public struct DNSClientContext {
-    internal let decoder: DNSDecoder
+    // internal let decoder: DNSDecoder
     
     public init(eventLoopGroup: EventLoopGroup) {
+        /*
         self.decoder = DNSDecoder(group: eventLoopGroup)
+        */
     }
 }
 

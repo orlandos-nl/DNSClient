@@ -64,9 +64,8 @@ extension DNSClient {
 
     /// Cancel all queries
     public func cancelQueries() {
-        for (id, query) in dnsDecoder.messageCache {
-            dnsDecoder.messageCache[id] = nil
-            query.promise.fail(CancelError())
+        Task {
+            await self.messageCache.failReset()
         }
     }
 
@@ -95,16 +94,24 @@ extension DNSClient {
 
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
         let promise: EventLoopPromise<Message> = loop.makePromise()
-        dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
+        Task {
+            await self.messageCache.addQuery(SentQuery(message: message, promise: promise))
         
-        channel.writeAndFlush(message, promise: nil)
+            do {
+                let channel = try await channel
+                channel.writeAndFlush(message, promise: nil)
+            } catch {
+                promise.fail(error)
+            }
         
-        struct DNSTimeoutError: Error {}
+            struct DNSTimeoutError: Error {}
         
-        loop.scheduleTask(in: .seconds(30)) {
-            promise.fail(DNSTimeoutError())
-        }
+            loop.scheduleTask(in: .seconds(30)) {
+                promise.fail(DNSTimeoutError())
+            }
 
+        }
+        
         return promise.futureResult
     }
 

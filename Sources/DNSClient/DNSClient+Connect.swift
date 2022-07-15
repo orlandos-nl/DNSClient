@@ -63,7 +63,7 @@ extension DNSClient {
             return group.next().makeFailedFuture(error)
         }
     }
-    
+    /*
     public static func initializeChannel(_ channel: Channel, context: DNSClientContext, asEnvelopeTo remoteAddress: SocketAddress? = nil) -> EventLoopFuture<Void> {
         if let remoteAddress = remoteAddress {
             return channel.pipeline.addHandlers(
@@ -76,38 +76,45 @@ extension DNSClient {
             return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
         }
     }
+    */
 
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let clientPromise = group.next().makePromise(of: DNSClient.self)
 
-        let bootstrap = DatagramBootstrap(group: group)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
-            .channelInitializer { channel in
-                return channel.pipeline.addHandlers(
-                    EnvelopeInboundChannel(),
-                    dnsDecoder,
-                    EnvelopeOutboundChannel(address: address),
-                    DNSEncoder()
-                )
-        }
+        clientPromise.completeWithTask {
+            let channelWrapper = GuaranteedAsyncValue<Channel, DNSClient> { client in
+                let dnsDecoder = DNSDecoder(group: group, client: client)
+                let bootstrap = DatagramBootstrap(group: group)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+                .channelInitializer { channel in
+                    return channel.pipeline.addHandlers(
+                        EnvelopeInboundChannel(),
+                        dnsDecoder,
+                        EnvelopeOutboundChannel(address: address),
+                        DNSEncoder()
+                    )
+                }
+                let ipv4 = address.protocol.rawValue == PF_INET
+                return try await bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).get()
+            } precondition: { channel, _ in
+                channel.isActive
+            }
 
-		let ipv4 = address.protocol.rawValue == PF_INET
-		
-        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
             let client = DNSClient(
-                channel: channel,
+                channelWrapper: channelWrapper,
                 address: address,
-                decoder: dnsDecoder
+                eventLoop: group.next()
             )
 
-            dnsDecoder.mainClient = client
             return client
         }
+
+        return clientPromise.futureResult
     }
     
     public static func connectTCP(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
@@ -115,28 +122,29 @@ extension DNSClient {
             return group.next().makeFailedFuture(MissingNameservers())
         }
         
-        let dnsDecoder = DNSDecoder(group: group)
-        
-        let bootstrap = ClientBootstrap(group: group)
-            .channelInitializer { channel in
-                return channel.pipeline.addHandlers(
-                    ByteToMessageHandler(UInt16FrameDecoder()),
-                    MessageToByteHandler(UInt16FrameEncoder()),
-                    dnsDecoder,
-                    DNSEncoder()
-                )
+        let clientPromise = group.next().makePromise(of: DNSClient.self)
+
+        clientPromise.completeWithTask {
+            let channelWrapper = GuaranteedAsyncValue<Channel, DNSClient> { client in 
+                let dnsDecoder = DNSDecoder(group: group, client: client)        
+                let bootstrap = ClientBootstrap(group: group)
+                    .channelInitializer { channel in
+                        return channel.pipeline.addHandlers(
+                            ByteToMessageHandler(UInt16FrameDecoder()),
+                            MessageToByteHandler(UInt16FrameEncoder()),
+                            dnsDecoder,
+                            DNSEncoder()
+                        )
+                    }
+
+                return try await bootstrap.connect(to: address).get()
+            } precondition: { channel, _ in
+                channel.isActive
             }
-        
-        return bootstrap.connect(to: address).map { channel in
-            let client = DNSClient(
-                channel: channel,
-                address: address,
-                decoder: dnsDecoder
-            )
-            
-            dnsDecoder.mainClient = client
-            return client
+
+            return DNSClient(channelWrapper: channelWrapper, address: address, eventLoop: group.next())
         }
+        return clientPromise.futureResult
     }
 }
 
