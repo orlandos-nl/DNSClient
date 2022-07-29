@@ -236,7 +236,7 @@ extension Array where Element == DNSLabel {
             }
             
             return nil
-            }.joined(separator: ".")
+        }.joined(separator: ".")
     }
 }
 

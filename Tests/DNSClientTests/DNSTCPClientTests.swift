@@ -81,6 +81,16 @@ final class DNSTCPClientTests: XCTestCase {
         self.waitForExpectations(timeout: 5, handler: nil)
     }
     
+//    func testMulticastDNS() async throws {
+//        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+//        let client = try await DNSClient.connectMulticast(on: eventLoopGroup).get()
+//        let addresses = try await client.sendQuery(
+//            forHost: "my-host.local",
+//            type: .any
+//        ).get()
+//        print(addresses)
+//    }
+    
     func testThreadSafety() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let client = try await DNSClient.connectTCP(

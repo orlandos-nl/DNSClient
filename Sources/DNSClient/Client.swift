@@ -4,6 +4,7 @@ public final class DNSClient: Resolver {
     let dnsDecoder: DNSDecoder
     let channel: Channel
     let primaryAddress: SocketAddress
+    internal var isMulticast = false
     var loop: EventLoop {
         return channel.eventLoop
     }
