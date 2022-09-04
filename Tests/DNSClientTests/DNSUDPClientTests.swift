@@ -59,6 +59,11 @@ final class DNSUDPClientTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
     }
 
+    func testSendQueryCNAME() throws {
+        let result = try dnsClient.sendQuery(forHost: "www.youtube.com", type: .cName).wait()
+        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    }
+
     func testSRVRecords() throws {
         let answers = try dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net").wait()
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")

@@ -58,7 +58,12 @@ final class DNSTCPClientTests: XCTestCase {
         let result = try dnsClient.sendQuery(forHost: "gmail.com", type: .mx).wait()
         XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
     }
-    
+
+    func testSendQueryCNAME() throws {
+        let result = try dnsClient.sendQuery(forHost: "www.youtube.com", type: .cName).wait()
+        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    }
+
     func testSRVRecords() throws {
         let answers = try dnsClient.getSRVRecords(from: "_mongodb._tcp.ok0-xkvc1.mongodb.net").wait()
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
@@ -101,6 +106,7 @@ final class DNSTCPClientTests: XCTestCase {
         try testSRVRecords()
         try testSRVRecordsAsyncRequest()
         try testSendQueryMX()
+        try testSendQueryCNAME()
         try testSendTxtQuery()
         try testAQuery()
         try testAAAAQuery()

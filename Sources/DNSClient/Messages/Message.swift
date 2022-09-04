@@ -76,6 +76,7 @@ public enum Record {
     case aaaa(ResourceRecord<AAAARecord>)
     case a(ResourceRecord<ARecord>)
     case txt(ResourceRecord<TXTRecord>)
+    case cname(ResourceRecord<CNAMERecord>)
     case srv(ResourceRecord<SRVRecord>)
     case mx(ResourceRecord<MXRecord>)
     case other(ResourceRecord<ByteBuffer>)
@@ -130,6 +131,16 @@ public struct MXRecord: DNSResource {
     }
 }
 
+public struct CNAMERecord: DNSResource {
+    public let labels: [DNSLabel]
+
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> CNAMERecord? {
+        guard let labels = buffer.readLabels() else {
+            return nil
+        }
+        return CNAMERecord(labels: labels)
+    }
+}
 
 public struct ARecord: DNSResource {
     public let address: UInt32

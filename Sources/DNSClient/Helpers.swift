@@ -169,6 +169,12 @@ extension ByteBuffer {
             }
 
             return .mx(mx)
+        case .cName:
+            guard let cname = make(CNAMERecord.self) else {
+                return nil
+            }
+
+            return .cname(cname)
         default:
             break
         }
