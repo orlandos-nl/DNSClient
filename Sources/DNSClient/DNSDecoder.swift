@@ -71,9 +71,13 @@ final class DNSDecoder: ChannelInboundHandler {
                 authorities: authorities,
                 additionalData: additionalData
             )
+            
+            if !header.options.contains(.answer) {
+                return
+            }
 
             guard let query = messageCache[header.id] else {
-                throw UnknownQuery()
+                return
             }
 
             query.promise.succeed(message)

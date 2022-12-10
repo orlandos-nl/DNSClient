@@ -33,6 +33,20 @@ extension DNSClient {
         }
     }
     
+    public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
+        do {
+            let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
+            
+            return connect(on: group, config: [address]).flatMap { client in
+                let channel = client.channel as! MulticastChannel
+                client.isMulticast = true
+                return channel.joinGroup(address).map { client }
+            }
+        } catch {
+            return group.next().makeFailedFuture(UnableToParseConfig())
+        }
+    }
+    
     /// Connect to the dns server using TCP
     ///
     /// - parameters:

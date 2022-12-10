@@ -64,14 +64,11 @@ final class DNSEncoder: ChannelOutboundHandler {
         let header = message.header
 
         out.write(header)
+        var labelIndices = [String : UInt16]()
 
         for question in message.questions {
-            for label in question.labels {
-                out.writeInteger(label.length, endianness: .big)
-                out.writeBytes(label.label)
-            }
+            out.writeCompressedLabels(question.labels, labelIndices: &labelIndices)
 
-            out.writeInteger(0, endianness: .big, as: UInt8.self)
             out.writeInteger(question.type.rawValue, endianness: .big)
             out.writeInteger(question.questionClass.rawValue, endianness: .big)
         }

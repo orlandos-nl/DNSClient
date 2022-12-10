@@ -81,7 +81,12 @@ extension DNSClient {
         channel.eventLoop.flatSubmit {
             self.messageID = self.messageID &+ 1
             
-            var options: MessageOptions = [.standardQuery, .recursionDesired]
+            var options: MessageOptions = [.standardQuery]
+            
+            if !self.isMulticast {
+                options.insert(.recursionDesired)
+            }
+            
             if let additionalOptions = additionalOptions {
                 options.insert(additionalOptions)
             }
