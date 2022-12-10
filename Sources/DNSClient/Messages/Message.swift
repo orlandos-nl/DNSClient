@@ -228,7 +228,7 @@ struct ZoneAuthority {
     let minimumExpireTimeout: UInt32
 }
 
-extension Array where Element == DNSLabel {
+extension Sequence where Element == DNSLabel {
     public var string: String {
         return self.compactMap { label in
             if let string = String(bytes: label.label, encoding: .utf8), string.count > 0 {
@@ -237,6 +237,49 @@ extension Array where Element == DNSLabel {
             
             return nil
         }.joined(separator: ".")
+    }
+}
+
+extension ByteBuffer {
+    /// Either write label index or list of labels
+    @discardableResult
+    mutating func writeCompressedLabels(_ labels: [DNSLabel], labelIndices: inout [String: UInt16]) -> Int {
+        var written = 0
+        var labels = labels
+        while !labels.isEmpty {
+            let label = labels.removeFirst()
+            // use combined labels as a key for a position in the packet
+            let key = labels.string
+            // if position exists output position or'ed with 0xc000 and return
+            if let labelIndex = labelIndices[key] {
+                written += writeInteger(labelIndex | 0xc000)
+                return written
+            } else {
+                // if no position exists for this combination of labels output the first label
+                labelIndices[key] = numericCast(writerIndex)
+                written += writeInteger(UInt8(label.label.count))
+                written += writeBytes(label.label)
+            }
+        }
+        // write end of labels
+        written += writeInteger(UInt8(0))
+        return written
+    }
+    
+    /// write labels into DNS packet
+    @discardableResult
+    mutating func writeLabels(_ labels: [DNSLabel]) -> Int {
+        var written = 0
+        for label in labels {
+            written += writeInteger(UInt8(label.label.count))
+            written += writeBytes(label.label)
+        }
+        
+        return written
+    }
+    
+    func labelsSize(_ labels: [DNSLabel]) -> Int {
+        return labels.reduce(0, { $0 + 2 + $1.label.count })
     }
 }
 
