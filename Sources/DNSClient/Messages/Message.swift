@@ -124,7 +124,7 @@ public enum DataClass: UInt16 {
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs)
     case chaos = 3
 
-    /// The Hesiod class (Obsolete - used only for examples in some obsolete RFCs)
+    /// The Hesiod class (Obsolete -
     case hesoid = 4
 }
 
@@ -214,12 +214,14 @@ public struct MXRecord: DNSResource {
         guard let labels = buffer.readLabels() else {
             return nil
         }
+
         return MXRecord(preference: Int(preference), labels: labels)
     }
 }
 
-/// An IPv4 address record. This is used for resolving hostnames to IP addresses.
+/// A canonical name record. This is used for aliasing hostnames.
 public struct CNAMERecord: DNSResource {
+    /// The labels of the alias.
     public let labels: [DNSLabel]
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> CNAMERecord? {
@@ -230,6 +232,7 @@ public struct CNAMERecord: DNSResource {
     }
 }
 
+/// An IPv4 address record. This is used for resolving hostnames to IP addresses.
 public struct ARecord: DNSResource {
     /// The address of the record. This is a 32-bit integer.
     public let address: UInt32

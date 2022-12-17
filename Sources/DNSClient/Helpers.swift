@@ -49,8 +49,8 @@ extension ByteBuffer {
 
                 guard
                     var offset = self.readInteger(endianness: .big, as: UInt16.self)
-                    else {
-                        return nil
+                else {
+                    return nil
                 }
 
                 offset = offset & 0b00111111_11111111

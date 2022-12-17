@@ -43,10 +43,23 @@ final class DNSTCPClientTests: XCTestCase {
         let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
         XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
     }
-    
+
+    // Test that we can resolve a domain name to an IPv6 address
     func testAAAAQuery() throws {
         let results = try dnsClient.initiateAAAAQuery(host: "google.com", port: 443).wait()
         XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
+    }
+
+    // Given a domain name, test that we can resolve it to an IPv4 address
+    func testSendQueryA() throws {
+        let result = try dnsClient.sendQuery(forHost: "google.com", type: .a).wait()
+        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    }
+
+    // Test that we can resolve example.com to an IPv6 address
+    func testResolveExampleCom() throws {
+        let result = try dnsClient.sendQuery(forHost: "example.com", type: .aaaa).wait()
+        XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
     }
     
     func testSendTxtQuery() throws {
