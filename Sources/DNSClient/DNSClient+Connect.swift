@@ -33,6 +33,9 @@ extension DNSClient {
         }
     }
     
+    /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
+    /// - parameters:
+    ///    - group: EventLoops to use
     public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
             let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
@@ -78,6 +81,12 @@ extension DNSClient {
         }
     }
     
+    /// Set up the UDP channel to use the DNS protocol.
+    /// - Parameters:
+    ///   - channel: The UDP channel to use.
+    ///   - context: A context containing the decoder and encoder to use.
+    ///   - remoteAddress: The address to send the DNS requests to - based on NIO's AddressedEnvelope.
+    /// - Returns: A future that will be completed when the channel is ready to use.
     public static func initializeChannel(_ channel: Channel, context: DNSClientContext, asEnvelopeTo remoteAddress: SocketAddress? = nil) -> EventLoopFuture<Void> {
         if let remoteAddress = remoteAddress {
             return channel.pipeline.addHandlers(
@@ -91,6 +100,11 @@ extension DNSClient {
         }
     }
 
+    /// Connect to the dns server and return a future with the client. This method will use UDP.
+    /// - parameters:
+    ///   - group: EventLoops to use
+    ///  - config: DNS servers to connect to
+    /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
@@ -124,6 +138,11 @@ extension DNSClient {
         }
     }
     
+    /// Connect to the dns server using TCP and return a future with the client.
+    /// - parameters:
+    ///    - group: EventLoops to use
+    ///    - config: DNS servers to connect to
+    /// - returns: Future with the NioDNS client
     public static func connectTCP(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
@@ -165,7 +184,13 @@ import NIOTransportServices
 
 @available(iOS 12, *)
 extension DNSClient {
+    /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
+    /// - parameters:
+    ///   - group: EventLoops to use
+    ///   - config: DNS servers to use
+    /// - returns: Future with the NioDNS client. Use 
     public static func connectTS(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
+        let ea
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
         }
@@ -190,11 +215,10 @@ extension DNSClient {
             return client
         }
     }
-    /// Connect to the dns server
-    ///
+    /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
+    /// The DNS Host is read from /etc/resolv.conf
     /// - parameters:
-    ///     - group: EventLoops to use
-    /// - returns: Future with the NioDNS client
+    ///   - group: EventLoops to use
     public static func connectTS(on group: NIOTSEventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
             let configString = try String(contentsOfFile: "/etc/resolv.conf")

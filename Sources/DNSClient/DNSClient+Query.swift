@@ -62,7 +62,7 @@ extension DNSClient {
         }
     }
 
-    /// Cancel all queries
+    /// Cancel all queries that are currently running. This will fail all futures with a `CancelError`
     public func cancelQueries() {
         for (id, query) in dnsDecoder.messageCache {
             dnsDecoder.messageCache[id] = nil

@@ -2,6 +2,7 @@ import NIO
 
 fileprivate let nameserverPrefix = "nameserver"
 
+/// A struct representing the contents of a resolv.conf file.
 struct ResolvConf {
     let nameservers: [SocketAddress]
 
