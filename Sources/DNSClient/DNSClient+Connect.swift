@@ -190,7 +190,6 @@ extension DNSClient {
     ///   - config: DNS servers to use
     /// - returns: Future with the NioDNS client. Use 
     public static func connectTS(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
-        let ea
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
         }
