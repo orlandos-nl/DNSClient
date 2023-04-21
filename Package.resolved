@@ -6,8 +6,8 @@
         "repositoryURL": "https://github.com/apple/swift-atomics.git",
         "state": {
           "branch": null,
-          "revision": "ff3d2212b6b093db7f177d0855adbc4ef9c5f036",
-          "version": "1.0.3"
+          "revision": "6c89474e62719ddcc1e9614989fff2f68208fe10",
+          "version": "1.1.0"
         }
       },
       {
@@ -24,17 +24,17 @@
         "repositoryURL": "https://github.com/apple/swift-nio.git",
         "state": {
           "branch": null,
-          "revision": "9b2848d76f5caad08b97e71a04345aa5bdb23a06",
-          "version": "2.49.0"
+          "revision": "e0cc6dd6ffa8e6a6f565938acd858b24e47902d0",
+          "version": "2.50.0"
         }
       },
       {
         "package": "swift-nio-transport-services",
         "repositoryURL": "https://github.com/Joannis/swift-nio-transport-services.git",
         "state": {
-          "branch": "feature/udp-networking-framework-support",
+          "branch": null,
           "revision": "f3e37707974cab7d02785b66a24f1baccb4cdc8d",
-          "version": null
+          "version": "1.17.0"
         }
       }
     ]

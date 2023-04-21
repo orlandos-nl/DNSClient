@@ -122,7 +122,7 @@ final class DNSTCPClientTests: XCTestCase {
         
         _ = try await [result, result2, result3]
         
-        try client.channel.close(mode: .all).wait()
+        try await client.channel.close(mode: .all).get()
     }
     
     func testAll() throws {
