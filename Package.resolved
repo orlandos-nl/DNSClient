@@ -30,11 +30,11 @@
       },
       {
         "package": "swift-nio-transport-services",
-        "repositoryURL": "https://github.com/apple/swift-nio-transport-services.git",
+        "repositoryURL": "https://github.com/Joannis/swift-nio-transport-services.git",
         "state": {
-          "branch": null,
-          "revision": "c0d9a144cfaec8d3d596aadde3039286a266c15c",
-          "version": "1.15.0"
+          "branch": "feature/udp-networking-framework-support",
+          "revision": "f3e37707974cab7d02785b66a24f1baccb4cdc8d",
+          "version": null
         }
       }
     ]
