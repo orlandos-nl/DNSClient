@@ -179,28 +179,96 @@ fileprivate extension Array where Element == SocketAddress {
     }
 }
 
-#if canImport(NIOTransportServices) && os(iOS)
+#if canImport(Network)
 import NIOTransportServices
 
 @available(iOS 12, *)
 extension DNSClient {
+    public static func connectTS(on group: NIOTSEventLoopGroup, host: String) -> EventLoopFuture<DNSClient> {
+        do {
+            let address = try SocketAddress(ipAddress: host, port: 53)
+            return connectTS(on: group, config: [address])
+        } catch {
+            return group.next().makeFailedFuture(error)
+        }
+    }
+
     /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
     /// - parameters:
     ///   - group: EventLoops to use
     ///   - config: DNS servers to use
     /// - returns: Future with the NioDNS client. Use 
     public static func connectTS(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
+        // Don't connect by UNIX domain socket. We currently don't intend to test & support that.
+        guard
+            let address = config.preferred,
+            let ipAddress = address.ipAddress,
+            let port = address.port
+        else {
+            return group.next().makeFailedFuture(MissingNameservers())
+        }
+
+        let dnsDecoder = DNSDecoder(group: group)
+        
+        return NIOTSDatagramBootstrap(group: group).channelInitializer { channel in
+            return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+        }
+        .connect(host: ipAddress, port: port)
+        .map { channel -> DNSClient in
+            let client = DNSClient(
+                channel: channel,
+                address: address,
+                decoder: dnsDecoder
+            )
+
+            dnsDecoder.mainClient = client
+            return client
+        }
+    }
+
+    /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
+    /// The DNS Host is read from /etc/resolv.conf
+    /// - parameters:
+    ///   - group: EventLoops to use
+    public static func connectTS(on group: NIOTSEventLoopGroup) -> EventLoopFuture<DNSClient> {
+        do {
+            let configString = try String(contentsOfFile: "/etc/resolv.conf")
+            let config = try ResolvConf(from: configString)
+
+            return connectTS(on: group, config: config.nameservers)
+        } catch {
+            return group.next().makeFailedFuture(UnableToParseConfig())
+        }
+    }
+
+    public static func connectTSTCP(on group: NIOTSEventLoopGroup, host: String) -> EventLoopFuture<DNSClient> {
+        do {
+            let address = try SocketAddress(ipAddress: host, port: 53)
+            return connectTSTCP(on: group, config: [address])
+        } catch {
+            return group.next().makeFailedFuture(error)
+        }
+    }
+
+    /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
+    /// - parameters:
+    ///   - group: EventLoops to use
+    ///   - config: DNS servers to use
+    /// - returns: Future with the NioDNS client. Use 
+    public static func connectTSTCP(on group: NIOTSEventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
         let dnsDecoder = DNSDecoder(group: group)
         
-        return NIOTSDatagramBootstrap(group: group)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
-            .channelInitializer { channel in
-                return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+        return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
+            return channel.pipeline.addHandlers(
+                ByteToMessageHandler(UInt16FrameDecoder()),
+                MessageToByteHandler(UInt16FrameEncoder()),
+                dnsDecoder,
+                DNSEncoder()
+            )
         }
         .connect(to: address)
         .map { channel -> DNSClient in
@@ -214,16 +282,17 @@ extension DNSClient {
             return client
         }
     }
+    
     /// Connect to the dns server using TCP using NIOTransportServices. This is only available on iOS 12 and above.
     /// The DNS Host is read from /etc/resolv.conf
     /// - parameters:
     ///   - group: EventLoops to use
-    public static func connectTS(on group: NIOTSEventLoopGroup) -> EventLoopFuture<DNSClient> {
+    public static func connectTSTCP(on group: NIOTSEventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
             let configString = try String(contentsOfFile: "/etc/resolv.conf")
             let config = try ResolvConf(from: configString)
 
-            return connectTS(on: group, config: config.nameservers)
+            return connectTSTCP(on: group, config: config.nameservers)
         } catch {
             return group.next().makeFailedFuture(UnableToParseConfig())
         }
