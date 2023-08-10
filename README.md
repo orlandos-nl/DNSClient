@@ -8,9 +8,7 @@ Async DNS resolution, with all the DNS features you need!
 
 Add the package:
 
-`.package(name: "DNSClient", url: "https://github.com/OpenKitten/NioDNS.git", from: "2.0.0"),`
-
-(DNSClient name is needed because we renamed the repo on request by Apple on the Swift Forums)
+`.package(url: "https://github.com/orlandos-nl/DNSClient.git", from: "2.0.0"),`
 
 And to your target:
 
