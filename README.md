@@ -39,6 +39,14 @@ Resolve TXT Records:
 let records = try client.sendQuery(forHost: "example.com", type: .txt).wait()
 ```
 
+Resolve PTR Records:
+
+```swift
+let records = try client.ipv4InverseAddress("198.51.100.1").wait()
+
+let records = try client.ipv6InverseAddress("2001:DB8::").wait()
+```
+
 Need I say more?
 
 ### Notes
