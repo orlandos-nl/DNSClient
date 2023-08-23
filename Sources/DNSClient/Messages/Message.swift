@@ -45,6 +45,8 @@ public struct DNSLabel: ExpressibleByStringLiteral {
 }
 
 /// The type of resource record. This is used to determine the format of the record.
+///
+/// The official standard list of all Resource Record (RR) Types. [IANA](https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4)
 public enum DNSResourceType: UInt16 {
     /// A request for an IPv4 address
     case a = 1
@@ -78,7 +80,7 @@ public enum DNSResourceType: UInt16 {
     /// A request for a well known service description. 
     case wks
 
-    /// A request for a well known service description (Obsolete - see SRV).
+    /// A domain name pointer (ie. in-addr.arpa) for address to name
     case ptr
 
     /// A request for a canonical name for an alias
@@ -154,6 +156,9 @@ public enum Record {
     /// Mail exchange record. This is used for mail servers.
     case mx(ResourceRecord<MXRecord>)
 
+    /// A domain name pointer (ie. in-addr.arpa)
+    case ptr(ResourceRecord<PTRRecord>)
+    
     /// Any other record. This is used for records that are not yet supported through convenience methods.
     case other(ResourceRecord<ByteBuffer>)
 }

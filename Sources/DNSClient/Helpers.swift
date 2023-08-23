@@ -175,7 +175,13 @@ extension ByteBuffer {
             }
 
             return .cname(cname)
-        default:
+        case .ptr:
+            guard let ptr = make(PTRRecord.self) else {
+                return nil
+            }
+
+            return .ptr(ptr)
+            default:
             break
         }
 

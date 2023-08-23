@@ -97,4 +97,49 @@ final class DNSUDPClientTests: XCTestCase {
             }
         }
     }
+    
+    // 4.4.8.8.in-addr.arpa domain points to dns.google.
+    func testipv4InverseAddress() throws {
+        let answers = try dnsClient.ipv4InverseAddress("8.8.4.4").wait()
+        // print("getIPv4PTRRecords: ", answers[0].resource.domainName.string)
+        
+        XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+    }
+    
+    //  'nslookup 208.67.222.222' has multiple (3) PTR records for opendns.com
+    func testipv4InverseAddressMultipleResponses() throws {
+        let answers = try dnsClient.ipv4InverseAddress("208.67.222.222").wait()
+        
+        // for answer in answers {
+        //  print("testPTRRecords2", answer.domainName.string)
+        //  print("testPTRRecords2", answer.resource.domainName.string)
+        // }
+        
+        XCTAssertEqual(answers.count, 3, "The returned answers should be equal to 3")
+    }
+    
+    func testipv6InverseAddress() throws {
+        // dns.google.
+        // let answers = try dnsClient.ipv6InverseAddress("2001:4860:4860::8844").wait()
+        
+        // j.root-servers.net operated by Verisign, Inc.
+        let answers = try dnsClient.ipv6InverseAddress("2001:503:c27::2:30").wait()
+        // print("getIPv6PTRRecords: ", answers[0].resource.domainName.string)
+        
+        XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+    }
+    
+    func testipv6InverseAddressInvalidInput() throws {
+        XCTAssertThrowsError(try dnsClient.ipv6InverseAddress(":::0").wait()) { error in
+            XCTAssertEqual(error.localizedDescription , "The operation couldn’t be completed. (NIOCore.IOError error 1.)")
+        }
+    }
+    
+    func testPTRRecordDescription() throws {
+        let domainname = PTRRecord(domainName: [DNSLabel(stringLiteral: "dns"),
+                                               DNSLabel(stringLiteral: "google"),
+                                               DNSLabel(stringLiteral: "")])
+        
+        XCTAssertEqual(domainname.description, "PTRRecord: dns.google")
+    }
 }
