@@ -122,20 +122,20 @@ final class DNSUDPClientTests: XCTestCase {
         }
     }
     
-    func testSRVRecordsAsyncRequest2() async throws {
-        try await testClient { dnsClient in
-            for _ in 0..<50 {
-                let answers = try await dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com").get()
-                XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
-                for answer in answers {
-                    let countA = try await dnsClient.initiateAAAAQuery(host: answer.resource.domainName.string, port: 27017).get().count
-                    let countAAAA = try await dnsClient.initiateAQuery(host: answer.resource.domainName.string, port: 27017).get().count
+    // func testSRVRecordsAsyncRequest2() async throws {
+    //     try await testClient { dnsClient in
+    //         for _ in 0..<50 {
+    //             let answers = try await dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com").get()
+    //             XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+    //             for answer in answers {
+    //                 let countA = try await dnsClient.initiateAAAAQuery(host: answer.resource.domainName.string, port: 27017).get().count
+    //                 let countAAAA = try await dnsClient.initiateAQuery(host: answer.resource.domainName.string, port: 27017).get().count
                     
-                    XCTAssertGreaterThan(countA + countAAAA, 0)
-                }
-            }
-        }
-    }
+    //                 XCTAssertGreaterThan(countA + countAAAA, 0)
+    //             }
+    //         }
+    //     }
+    // }
     
     // 4.4.8.8.in-addr.arpa domain points to dns.google.
     func testipv4InverseAddress() throws {

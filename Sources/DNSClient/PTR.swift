@@ -1,10 +1,4 @@
-//
-//  PTR.swift
-//  
-//
-//  Created by Craig A. Munro on 8/18/23.
-//
-
+#if !os(Linux)
 import Foundation
 import NIO
 
@@ -76,10 +70,8 @@ extension DNSClient {
         }
         
         if retval == 0 {
-            // print("Invalid address: \(address)")
             throw IOError(errnoCode: EINVAL, reason: #function)
         } else if retval == -1 {
-            // print("Failed:", String(cString: strerror(errno)))
             throw IOError(errnoCode: errno, reason: #function)
         }
         
@@ -119,3 +111,4 @@ extension PTRRecord: CustomStringConvertible {
         "\(Self.self): " + domainName.string
     }
 }
+#endif
