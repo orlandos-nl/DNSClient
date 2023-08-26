@@ -1,4 +1,3 @@
-#if !os(Linux)
 import Foundation
 import NIO
 
@@ -19,6 +18,7 @@ public struct PTRRecord: DNSResource {
     }
 }
 
+#if !os(Linux)
 extension DNSClient {
     /// Request IPv4 inverse address (PTR records) from nameserver
     ///
@@ -105,10 +105,10 @@ extension DNSClient {
         }
     }
 }
+#endif
 
 extension PTRRecord: CustomStringConvertible {
     public var description: String {
         "\(Self.self): " + domainName.string
     }
 }
-#endif

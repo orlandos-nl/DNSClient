@@ -137,6 +137,7 @@ final class DNSUDPClientTests: XCTestCase {
     //     }
     // }
     
+    #if !os(Linux)
     // 4.4.8.8.in-addr.arpa domain points to dns.google.
     func testipv4InverseAddress() throws {
         let answers = try dnsClient.ipv4InverseAddress("8.8.4.4").wait()
@@ -181,4 +182,5 @@ final class DNSUDPClientTests: XCTestCase {
         
         XCTAssertEqual(domainname.description, "PTRRecord: dns.google")
     }
+    #endif
 }
