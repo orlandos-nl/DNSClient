@@ -1,4 +1,3 @@
-import Foundation
 import NIO
 
 /// A DNS PTR record. This is used for address to name mapping.
@@ -18,7 +17,6 @@ public struct PTRRecord: DNSResource {
     }
 }
 
-#if !os(Linux)
 extension DNSClient {
     /// Request IPv4 inverse address (PTR records) from nameserver
     ///
@@ -75,6 +73,30 @@ extension DNSClient {
             throw IOError(errnoCode: errno, reason: #function)
         }
         
+        #if os(Linux)
+        let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                      ipv6Addr.__in6_u.__u6_addr8.0,
+                      ipv6Addr.__in6_u.__u6_addr8.1,
+                      ipv6Addr.__in6_u.__u6_addr8.2,
+                      ipv6Addr.__in6_u.__u6_addr8.3,
+                      ipv6Addr.__in6_u.__u6_addr8.4,
+                      ipv6Addr.__in6_u.__u6_addr8.5,
+                      ipv6Addr.__in6_u.__u6_addr8.6,
+                      ipv6Addr.__in6_u.__u6_addr8.7,
+                      ipv6Addr.__in6_u.__u6_addr8.8,
+                      ipv6Addr.__in6_u.__u6_addr8.9,
+                      ipv6Addr.__in6_u.__u6_addr8.10,
+                      ipv6Addr.__in6_u.__u6_addr8.11,
+                      ipv6Addr.__in6_u.__u6_addr8.12,
+                      ipv6Addr.__in6_u.__u6_addr8.13,
+                      ipv6Addr.__in6_u.__u6_addr8.14,
+                      ipv6Addr.__in6_u.__u6_addr8.15
+        ).reversed()
+         .map { "\($0)" }
+         .joined(separator: ".")
+         .appending(".ip6.arpa.")
+        
+        #else
         let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
                       ipv6Addr.__u6_addr.__u6_addr8.0,
                       ipv6Addr.__u6_addr.__u6_addr8.1,
@@ -96,6 +118,7 @@ extension DNSClient {
          .map { "\($0)" }
          .joined(separator: ".")
          .appending(".ip6.arpa.")
+        #endif
         
         return self.sendQuery(forHost: inAddrArpaDomain, type: .ptr).map { message in
             return message.answers.compactMap { answer in
@@ -105,7 +128,6 @@ extension DNSClient {
         }
     }
 }
-#endif
 
 extension PTRRecord: CustomStringConvertible {
     public var description: String {
