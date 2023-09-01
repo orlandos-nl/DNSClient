@@ -137,7 +137,6 @@ final class DNSUDPClientTests: XCTestCase {
     //     }
     // }
     
-    #if !os(Linux)
     // 4.4.8.8.in-addr.arpa domain points to dns.google.
     func testipv4InverseAddress() throws {
         let answers = try dnsClient.ipv4InverseAddress("8.8.4.4").wait()
@@ -171,7 +170,12 @@ final class DNSUDPClientTests: XCTestCase {
     
     func testipv6InverseAddressInvalidInput() throws {
         XCTAssertThrowsError(try dnsClient.ipv6InverseAddress(":::0").wait()) { error in
+            
+            #if os(Linux)
+            XCTAssertEqual(error.localizedDescription , "The operation could not be completed. (NIOCore.IOError error 1.)")
+            #else
             XCTAssertEqual(error.localizedDescription , "The operation couldn’t be completed. (NIOCore.IOError error 1.)")
+            #endif
         }
     }
     
@@ -182,5 +186,4 @@ final class DNSUDPClientTests: XCTestCase {
         
         XCTAssertEqual(domainname.description, "PTRRecord: dns.google")
     }
-    #endif
 }
