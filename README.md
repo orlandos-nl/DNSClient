@@ -16,7 +16,8 @@ And to your target:
 
 ### Usage 🤯
 
-Connect to your default DNS Server:
+Connect to your default DNS Server using UDP:
+
 ```swift
 let client = try DNSClient.connect(on: loop).wait()
 ```
@@ -48,6 +49,29 @@ let records = try client.ipv6InverseAddress("2001:DB8::").wait()
 ```
 
 Need I say more?
+
+Note: You can replace `.wait()` function calls with `.get()` to get the result using async/await.
+
+### iOS and TCP Support
+
+On iOS 12+, you can connect using Network.Framework:
+
+```swift
+import NIOTransportServices
+import DNSClient
+
+let client = try DNSClient.connect(on: loop, host: "1.1.1.1").wait()
+```
+
+There is also another overload that implements TCP support:
+
+```swift
+let client = try DNSClient.connectTSTCP(on: loop, host: "1.1.1.1").wait()
+```
+
+TCP support is also available on Linux as `DNSClient.connectTCP(on: loop, host: ...)`
+
+Note that NIOTS (TransportServices) needs their own EventLoop type, whereas NIO's `MultiThreadedEventLoopGroup` is used for the POSIX/Linux implementation.
 
 ### Notes
 
