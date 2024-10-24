@@ -12,13 +12,13 @@ final class EnvelopeInboundChannel: ChannelInboundHandler {
     }
 }
 
-final class DNSDecoder: ChannelInboundHandler {
+public final class DNSDecoder: ChannelInboundHandler {
     let group: EventLoopGroup
     var messageCache = [UInt16: SentQuery]()
     var clients = [ObjectIdentifier: DNSClient]()
     weak var mainClient: DNSClient?
 
-    init(group: EventLoopGroup) {
+    public init(group: EventLoopGroup) {
         self.group = group
     }
 
@@ -26,20 +26,39 @@ final class DNSDecoder: ChannelInboundHandler {
     public typealias OutboundOut = Never
     
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let envelope = self.unwrapInboundIn(data)
-        var buffer = envelope
+        let message: Message
+
+        do {
+            message = try Self.parse(unwrapInboundIn(data))
+        } catch {
+            context.fireErrorCaught(error)
+            return
+        }
+
+        if !message.header.options.contains(.answer) {
+            return
+        }
+
+        guard let query = messageCache[message.header.id] else {
+            return
+        }
+
+        query.promise.succeed(message)
+        messageCache[message.header.id] = nil
+    }
+
+    public static func parse(_ buffer: ByteBuffer) throws -> Message {
+        var buffer = buffer
 
         guard let header = buffer.readHeader() else {
-            context.fireErrorCaught(ProtocolError())
-            return
+            throw ProtocolError()
         }
 
         var questions = [QuestionSection]()
 
         for _ in 0..<header.questionCount {
             guard let question = buffer.readQuestion() else {
-                context.fireErrorCaught(ProtocolError())
-                return
+                throw ProtocolError()
             }
 
             questions.append(question)
@@ -59,37 +78,20 @@ final class DNSDecoder: ChannelInboundHandler {
             return records
         }
 
-        do {
-            let answers = try resourceRecords(count: header.answerCount)
-            let authorities = try resourceRecords(count: header.authorityCount)
-            let additionalData = try resourceRecords(count: header.additionalRecordCount)
-            
-            let message = Message(
-                header: header,
-                questions: questions,
-                answers: answers,
-                authorities: authorities,
-                additionalData: additionalData
-            )
-            
-            if !header.options.contains(.answer) {
-                return
-            }
+        let answers = try resourceRecords(count: header.answerCount)
+        let authorities = try resourceRecords(count: header.authorityCount)
+        let additionalData = try resourceRecords(count: header.additionalRecordCount)
 
-            guard let query = messageCache[header.id] else {
-                return
-            }
-
-            query.promise.succeed(message)
-            messageCache[header.id] = nil
-        } catch {
-            messageCache[header.id]?.promise.fail(error)
-            messageCache[header.id] = nil
-            context.fireErrorCaught(error)
-        }
+        return Message(
+            header: header,
+            questions: questions,
+            answers: answers,
+            authorities: authorities,
+            additionalData: additionalData
+        )
     }
 
-    func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
+    public func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
         for query in self.messageCache.values {
             query.promise.fail(error)
         }

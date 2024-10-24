@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swift-version: ["5.7", "5.8"]
+        swift-version: ["5.7", "5.8", "5.9", "5.10", "6.0"]
     steps:
       - uses: actions/checkout@v3
 

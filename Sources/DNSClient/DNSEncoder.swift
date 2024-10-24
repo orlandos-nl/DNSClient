@@ -47,30 +47,54 @@ final class UInt16FrameEncoder: MessageToByteEncoder {
     }
 }
 
-final class DNSEncoder: ChannelOutboundHandler {
-    typealias OutboundIn = Message
-    typealias OutboundOut = ByteBuffer
-    
-    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let message = unwrapOutboundIn(data)
-        let data = DNSEncoder.encodeMessage(message, allocator: context.channel.allocator)
+public final class DNSEncoder: ChannelOutboundHandler {
+    public typealias OutboundIn = Message
+    public typealias OutboundOut = ByteBuffer
 
-        context.write(wrapOutboundOut(data), promise: promise)
+    public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let message = unwrapOutboundIn(data)
+        do {
+            var labelIndices = [String: UInt16]()
+            let data = try DNSEncoder.encodeMessage(
+                message,
+                allocator: context.channel.allocator,
+                labelIndices: &labelIndices
+            )
+
+            context.write(wrapOutboundOut(data), promise: promise)
+        } catch {
+            context.fireErrorCaught(error)
+        }
     }
     
-    static func encodeMessage(_ message: Message, allocator: ByteBufferAllocator) -> ByteBuffer {
+    public static func encodeMessage(
+        _ message: Message,
+        allocator: ByteBufferAllocator,
+        labelIndices: inout [String: UInt16]
+    ) throws -> ByteBuffer {
         var out = allocator.buffer(capacity: 512)
 
         let header = message.header
 
         out.write(header)
-        var labelIndices = [String : UInt16]()
 
         for question in message.questions {
             out.writeCompressedLabels(question.labels, labelIndices: &labelIndices)
 
             out.writeInteger(question.type.rawValue, endianness: .big)
             out.writeInteger(question.questionClass.rawValue, endianness: .big)
+        }
+
+        for answer in message.answers {
+            try out.writeAnyRecord(answer, labelIndices: &labelIndices)
+        }
+
+        for authority in message.authorities {
+            try out.writeAnyRecord(authority, labelIndices: &labelIndices)
+        }
+
+        for additionalData in message.additionalData {
+            try out.writeAnyRecord(additionalData, labelIndices: &labelIndices)
         }
 
         return out

@@ -11,7 +11,11 @@ public struct PTRRecord: DNSResource {
         }
         return PTRRecord(domainName: domainName)
     }
-    
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
+    }
+
     public init(domainName: [DNSLabel]) {
         self.domainName = domainName
     }
