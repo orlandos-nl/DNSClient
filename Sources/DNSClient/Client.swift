@@ -8,7 +8,7 @@ public final class DNSClient: Resolver, Sendable {
     let dnsDecoder: DNSDecoder
     let channel: Channel
     let primaryAddress: SocketAddress
-    private let isMulticastBox = NIOLockedBox(false)
+    private let isMulticastBox = NIOLockedValueBox(false)
     internal var isMulticast: Bool {
         get { isMulticastBox.withLockedValue { $0 } }
         set { isMulticastBox.withLockedValue { $0 = newValue } }
@@ -18,7 +18,7 @@ public final class DNSClient: Resolver, Sendable {
         return channel.eventLoop
     }
     // Each query has an ID to keep track of which response belongs to which query
-    let messageID: Atomic<UInt16> = Atomic(0)
+    let messageID: Atomic<UInt16> = Atomic(value: 0)
     
     internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
         self.channel = channel
