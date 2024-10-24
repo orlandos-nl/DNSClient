@@ -98,6 +98,44 @@ extension ByteBuffer {
         return QuestionSection(labels: labels, type: type, questionClass: dataClass)
     }
 
+    mutating func writeRecord<RecordType: DNSResource>(
+        _ record: ResourceRecord<RecordType>,
+        labelIndices: inout [String: UInt16]
+    ) throws {
+        writeCompressedLabels(record.domainName, labelIndices: &labelIndices)
+        writeInteger(record.dataType)
+        writeInteger(record.dataClass)
+        writeInteger(record.ttl)
+
+        try writeLengthPrefixed(as: UInt16.self) { buffer in
+            record.resource.write(into: &buffer, labelIndices: &labelIndices)
+        }
+    }
+
+    mutating func writeAnyRecord(
+        _ record: Record,
+        labelIndices: inout [String: UInt16]
+    ) throws {
+        switch record {
+        case .aaaa(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .a(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .txt(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .cname(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .srv(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .mx(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .ptr(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .other(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        }
+    }
+
     mutating func readRecord() -> Record? {
         guard
             let labels = readLabels(),

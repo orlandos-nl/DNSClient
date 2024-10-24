@@ -20,6 +20,22 @@ public struct DNSMessageHeader {
 
     /// The number of additional records in the message.
     public let additionalRecordCount: UInt16
+
+    public init(
+        id: UInt16,
+        options: MessageOptions,
+        questionCount: UInt16,
+        answerCount: UInt16,
+        authorityCount: UInt16,
+        additionalRecordCount: UInt16
+    ) {
+        self.id = id
+        self.options = options
+        self.questionCount = questionCount
+        self.answerCount = answerCount
+        self.authorityCount = authorityCount
+        self.additionalRecordCount = additionalRecordCount
+    }
 }
 
 /// A label in a DNS message. This is a single part of a domain name. For example, `google` is a label in `google.com`. Labels are limited to 63 bytes and are not null terminated.
@@ -203,6 +219,10 @@ public struct TXTRecord: DNSResource {
         
         return TXTRecord(values: components, rawValues: rawValues)
     }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        fatalError()
+    }
 }
 
 /// A mail exchange record. This is used for mail servers.
@@ -222,6 +242,11 @@ public struct MXRecord: DNSResource {
 
         return MXRecord(preference: Int(preference), labels: labels)
     }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        let length = buffer.writeInteger(preference)
+        return length + buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+    }
 }
 
 /// A canonical name record. This is used for aliasing hostnames.
@@ -235,12 +260,20 @@ public struct CNAMERecord: DNSResource {
         }
         return CNAMERecord(labels: labels)
     }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+    }
 }
 
 /// An IPv4 address record. This is used for resolving hostnames to IP addresses.
 public struct ARecord: DNSResource {
     /// The address of the record. This is a 32-bit integer.
     public let address: UInt32
+
+    public init(address: UInt32) {
+        self.address = address
+    }
 
     /// The address of the record as a string.
     public var stringAddress: String {
@@ -253,6 +286,10 @@ public struct ARecord: DNSResource {
     public static func read(from buffer: inout ByteBuffer, length: Int) -> ARecord? {
         guard let address = buffer.readInteger(endianness: .big, as: UInt32.self) else { return nil }
         return ARecord(address: address)
+    }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        buffer.writeInteger(address)
     }
 }
 
@@ -275,6 +312,10 @@ public struct AAAARecord: DNSResource {
         guard let address = buffer.readBytes(length: 16) else { return nil }
         return AAAARecord(address: address)
     }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        buffer.writeBytes(address)
+    }
 }
 
 /// A structure representing a DNS resource record. This is used for storing the data of a DNS record.
@@ -293,17 +334,36 @@ public struct ResourceRecord<Resource: DNSResource> {
     
     /// The resource of the record. This is the data of the record.
     public var resource: Resource
+
+    public init(
+        domainName: [DNSLabel],
+        dataType: UInt16,
+        dataClass: UInt16,
+        ttl: UInt32,
+        resource: Resource
+    ) {
+        self.domainName = domainName
+        self.dataType = dataType
+        self.dataClass = dataClass
+        self.ttl = ttl
+        self.resource = resource
+    }
 }
 
 /// A protocol that can be used to read a DNS resource from a buffer.
 public protocol DNSResource {
     static func read(from buffer: inout ByteBuffer, length: Int) -> Self?
+    func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int
 }
 
 /// An extension to `ByteBuffer` that adds a method for reading a DNS resource.
 extension ByteBuffer: DNSResource {
     public static func read(from buffer: inout ByteBuffer, length: Int) -> ByteBuffer? {
         return buffer.readSlice(length: length)
+    }
+
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
+        buffer.writeImmutableBuffer(self)
     }
 }
 
@@ -370,7 +430,7 @@ extension Sequence where Element == DNSLabel {
 }
 
 extension ByteBuffer {
-    /// Either write label index or list of labels
+    /// Either write label index or list of labelsf
     @discardableResult
     mutating func writeCompressedLabels(_ labels: [DNSLabel], labelIndices: inout [String: UInt16]) -> Int {
         var written = 0
@@ -418,4 +478,18 @@ public struct Message {
     public let answers: [Record]
     public let authorities: [Record]
     public let additionalData: [Record]
+
+    public init(
+        header: DNSMessageHeader,
+        questions: [QuestionSection],
+        answers: [Record],
+        authorities: [Record],
+        additionalData: [Record]
+    ) {
+        self.header = header
+        self.questions = questions
+        self.answers = answers
+        self.authorities = authorities
+        self.additionalData = additionalData
+    }
 }
