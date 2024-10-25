@@ -1,4 +1,5 @@
 import NIO
+import NIOConcurrencyHelpers
 
 final class EnvelopeInboundChannel: ChannelInboundHandler {
     typealias InboundIn = AddressedEnvelope<ByteBuffer>
@@ -12,10 +13,10 @@ final class EnvelopeInboundChannel: ChannelInboundHandler {
     }
 }
 
-public final class DNSDecoder: ChannelInboundHandler {
+public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     let group: EventLoopGroup
-    var messageCache = [UInt16: SentQuery]()
-    var clients = [ObjectIdentifier: DNSClient]()
+    let messageCache = NIOLockedValueBox<[UInt16: SentQuery]>([:])
+    let clients = NIOLockedValueBox<[ObjectIdentifier: DNSClient]>([:])
     weak var mainClient: DNSClient?
 
     public init(group: EventLoopGroup) {
@@ -39,12 +40,14 @@ public final class DNSDecoder: ChannelInboundHandler {
             return
         }
 
-        guard let query = messageCache[message.header.id] else {
-            return
-        }
+        messageCache.withLockedValue { cache in
+            guard let query = cache[message.header.id] else {
+                return
+            }
 
-        query.promise.succeed(message)
-        messageCache[message.header.id] = nil
+            query.promise.succeed(message)
+            cache[message.header.id] = nil
+        }
     }
 
     public static func parse(_ buffer: ByteBuffer) throws -> Message {
@@ -92,10 +95,12 @@ public final class DNSDecoder: ChannelInboundHandler {
     }
 
     public func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
-        for query in self.messageCache.values {
-            query.promise.fail(error)
-        }
+        messageCache.withLockedValue { cache in
+            for query in cache.values {
+                query.promise.fail(error)
+            }
 
-        messageCache = [:]
+            cache = [:]
+        }
     }
 }

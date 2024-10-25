@@ -65,9 +65,11 @@ extension DNSClient {
 
     /// Cancel all queries that are currently running. This will fail all futures with a `CancelError`
     public func cancelQueries() {
-        for (id, query) in dnsDecoder.messageCache {
-            dnsDecoder.messageCache[id] = nil
-            query.promise.fail(CancelError())
+        dnsDecoder.messageCache.withLockedValue { cache in
+            for (id, query) in cache {
+                cache[id] = nil
+                query.promise.fail(CancelError())
+            }
         }
     }
 
@@ -80,7 +82,11 @@ extension DNSClient {
     /// - returns: A future with the response message
     public func sendQuery(forHost address: String, type: DNSResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
         channel.eventLoop.flatSubmit {
-            let messageID = self.messageID.add(1)
+            let messageID = self.messageID.withLockedValue { id in
+                let newID = id &+ 1
+                id = newID
+                return id
+            }
             
             var options: MessageOptions = [.standardQuery]
             
@@ -105,7 +111,9 @@ extension DNSClient {
         let promise: EventLoopPromise<Message> = loop.makePromise()
         
         return loop.flatSubmit {
-            self.dnsDecoder.messageCache[message.header.id] = SentQuery(message: message, promise: promise)
+            self.dnsDecoder.messageCache.withLockedValue { cache in
+                cache[message.header.id] = SentQuery(message: message, promise: promise)
+            }
             self.channel.writeAndFlush(message, promise: nil)
             
             struct DNSTimeoutError: Error {}
