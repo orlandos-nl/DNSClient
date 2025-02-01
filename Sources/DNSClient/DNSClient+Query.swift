@@ -32,7 +32,7 @@ extension DNSClient {
         let result = self.sendQuery(forHost: host, type: .aaaa)
 
         return result.map { message in
-            return message.answers.compactMap { answer in
+            return message.answers.compactMap { answer -> SocketAddress? in
                 guard
                     case .aaaa(let record) = answer,
                     record.resource.address.count == 16
@@ -45,11 +45,16 @@ extension DNSClient {
                 let scopeID: UInt32 = 0 // More info about scope_id/zone_id https://tools.ietf.org/html/rfc6874#page-3
                 let flowinfo: UInt32 = 0 // More info about flowinfo https://tools.ietf.org/html/rfc6437#page-4
                 
-                #if os(Linux)
+                #if canImport(Glibc)
                 let ipAddress = address.withUnsafeBytes { buffer in
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_u.self).baseAddress!.pointee
                 }
                 let sockaddr = sockaddr_in6(sin6_family: sa_family_t(AF_INET6), sin6_port: in_port_t(port), sin6_flowinfo: flowinfo, sin6_addr: in6_addr(__in6_u: ipAddress), sin6_scope_id: scopeID)
+                #elseif canImport(Musl)
+                let ipAddress = address.withUnsafeBytes { buffer in
+                    return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_union.self).baseAddress!.pointee
+                }
+                let sockaddr = sockaddr_in6(sin6_family: sa_family_t(AF_INET6), sin6_port: in_port_t(port), sin6_flowinfo: flowinfo, sin6_addr: in6_addr(__in6_union: ipAddress), sin6_scope_id: scopeID)
                 #else
                 let ipAddress = address.withUnsafeBytes { buffer in
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___u6_addr.self).baseAddress!.pointee
