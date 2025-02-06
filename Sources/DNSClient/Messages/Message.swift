@@ -39,7 +39,7 @@ public struct DNSMessageHeader {
 }
 
 /// A label in a DNS message. This is a single part of a domain name. For example, `google` is a label in `google.com`. Labels are limited to 63 bytes and are not null terminated.
-public struct DNSLabel: ExpressibleByStringLiteral {
+public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
     /// The length of the label. This is the number of bytes in the label.
     public let length: UInt8
     
@@ -319,7 +319,7 @@ public struct AAAARecord: DNSResource {
 }
 
 /// A structure representing a DNS resource record. This is used for storing the data of a DNS record.
-public struct ResourceRecord<Resource: DNSResource> {
+public struct ResourceRecord<Resource: DNSResource>: Sendable {
     /// The name of the record.
     public let domainName: [DNSLabel]
 
@@ -351,7 +351,7 @@ public struct ResourceRecord<Resource: DNSResource> {
 }
 
 /// A protocol that can be used to read a DNS resource from a buffer.
-public protocol DNSResource {
+public protocol DNSResource: Sendable {
     static func read(from buffer: inout ByteBuffer, length: Int) -> Self?
     func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int
 }

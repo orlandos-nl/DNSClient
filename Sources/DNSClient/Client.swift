@@ -18,7 +18,7 @@ public final class DNSClient: Resolver, Sendable {
         return channel.eventLoop
     }
     // Each query has an ID to keep track of which response belongs to which query
-    let messageID: Atomic<UInt16> = Atomic(value: 0)
+    let messageID: NIOLockedValueBox<UInt16> = NIOLockedValueBox(0)
     
     internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
         self.channel = channel
