@@ -1,31 +1,33 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
-
-name: Swift
+name: CI
 
 on:
   push:
-    branches: ["master"]
+    branches:
+    - main
+    paths:
+    - '**.swift'
+    - '**.yml'
   pull_request:
-    branches: ["master"]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-ci
+  cancel-in-progress: true
 
 jobs:
   linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
-      fail-fast: false
       matrix:
-        swift-version: ["5.7", "5.8", "5.9", "5.10", "6.0"]
+        image: ["swift:5.9", "swift:5.10", "swift:6.0", "swiftlang/swift:nightly-6.1-jammy"]
+    container:
+      image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Swift
-        uses: swift-actions/setup-swift@v1
-        with:
-          swift-version: ${{ matrix.swift-version }}
-
-      - name: Run tests
-        run: swift test
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Test
+      run: |
+        swift test
   macos:
     runs-on: macos-latest
 
