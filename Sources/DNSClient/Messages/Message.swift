@@ -2,7 +2,7 @@ import NIO
 import Foundation
 
 /// The header of a DNS message.
-public struct DNSMessageHeader {
+public struct DNSMessageHeader : Sendable{
     /// The ID of the message. This is used to match responses to requests.
     public internal(set) var id: UInt16
     
@@ -63,7 +63,7 @@ public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
 /// The type of resource record. This is used to determine the format of the record.
 ///
 /// The official standard list of all Resource Record (RR) Types. [IANA](https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4)
-public enum DNSResourceType: UInt16 {
+public enum DNSResourceType: UInt16, Sendable {
     /// A request for an IPv4 address
     case a = 1
 
@@ -135,7 +135,7 @@ public enum DNSResourceType: UInt16 {
 public typealias QuestionType = DNSResourceType
 
 /// The class of the resource record. This is used to determine the format of the record. 
-public enum DataClass: UInt16 {
+public enum DataClass: UInt16, Sendable {
     /// The Internet
     case internet = 1
 
@@ -146,14 +146,14 @@ public enum DataClass: UInt16 {
     case hesoid = 4
 }
 
-public struct QuestionSection {
+public struct QuestionSection : Sendable{
     public let labels: [DNSLabel]
     public let type: QuestionType
     public let questionClass: DataClass
 }
 
 /// A DNS message. This is the main type used for interacting with the DNS protocol.
-public enum Record {
+public enum Record : Sendable{
     /// An IPv6 address record. This is used for resolving hostnames to IP addresses.
     case aaaa(ResourceRecord<AAAARecord>)
 
@@ -472,7 +472,7 @@ extension ByteBuffer {
     }
 }
 
-public struct Message {
+public struct Message: Sendable {
     public internal(set) var header: DNSMessageHeader
     public let questions: [QuestionSection]
     public let answers: [Record]

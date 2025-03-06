@@ -2,7 +2,7 @@ fileprivate let opCodeBits: UInt16 = 0b01111000_00000000
 fileprivate let resultCodeBits: UInt16 = 0b00000000_00001111
 
 /// The options for a DNS message. These are used to specify the type of query, whether the message is an answer, and the result code.
-public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral {
+public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral, Sendable {
     public var rawValue: UInt16
 
     public init(rawValue: UInt16) {
