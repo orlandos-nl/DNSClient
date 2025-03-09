@@ -40,9 +40,10 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
         }
 
         let callback = handleMulticast.withLockedValue(\.self)
-        Task { [channel = context.channel] in
+        Task { [channel = context.channel, address = envelope.remoteAddress] in
             if let reply = try await callback(message) {
-                try await channel.writeAndFlush(reply)
+                let envelope = AddressedEnvelope(remoteAddress: address, data: reply)
+                try await channel.writeAndFlush(envelope)
             }
         }
     }
