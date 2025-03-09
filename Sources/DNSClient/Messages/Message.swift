@@ -39,22 +39,33 @@ public struct DNSMessageHeader: Sendable {
 }
 
 /// A label in a DNS message. This is a single part of a domain name. For example, `google` is a label in `google.com`. Labels are limited to 63 bytes and are not null terminated.
-public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
+public struct DNSLabel: ExpressibleByStringLiteral, CustomStringConvertible, Sendable {
     /// The length of the label. This is the number of bytes in the label.
     public let length: UInt8
     
     /// The bytes of the label. This is the actual label, not including the length byte. This is a maximum of 63 bytes and is not null terminated. This is the raw bytes of the label, not the UTF-8 representation.
     public let label: [UInt8]
-    
+
+    public var description: String {
+        String(bytes: label, encoding: .utf8)!
+    }
+
+    /// Creates a new label from the given string.
+    public init(_ string: some StringProtocol) {
+        self.init(bytes: string.utf8)
+    }
+
     /// Creates a new label from the given string.
     public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
     }
     
     /// Creates a new label from the given bytes.
-    public init(bytes: [UInt8]) {
+    public init(bytes: some Collection<UInt8>) {
         assert(bytes.count < 64)
-        
+        assert(!bytes.contains(0x00))
+
+        let bytes = Array(bytes)
         self.label = bytes
         self.length = UInt8(bytes.count)
     }
@@ -233,6 +244,16 @@ public struct MXRecord: DNSResource {
     /// The labels of the mail server.
     public let labels: [DNSLabel]
 
+    public init(preference: Int, labels: [DNSLabel]) {
+        self.preference = preference
+        self.labels = labels
+    }
+
+    public init(preference: Int, label: String) {
+        self.preference = preference
+        self.labels = label.split(separator: ".").map(DNSLabel.init)
+    }
+
     public static func read(from buffer: inout ByteBuffer, length: Int) -> MXRecord? {
         guard let preference = buffer.readInteger(endianness: .big, as: UInt16.self) else { return nil }
 
@@ -253,6 +274,10 @@ public struct MXRecord: DNSResource {
 public struct CNAMERecord: DNSResource {
     /// The labels of the alias.
     public let labels: [DNSLabel]
+
+    public init(labels: [DNSLabel]) {
+        self.labels = labels
+    }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> CNAMERecord? {
         guard let labels = buffer.readLabels() else {

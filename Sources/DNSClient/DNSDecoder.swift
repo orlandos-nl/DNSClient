@@ -27,25 +27,22 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
-        var handled = false
         if message.header.options.contains(.answer) {
-            handled = messageCache.withLockedValue { cache in
+            return messageCache.withLockedValue { cache in
                 guard let query = cache[message.header.id] else {
-                    return false
+                    return
                 }
 
                 query.continuation.yield(message)
                 cache[message.header.id] = nil
-                return true
+                return
             }
         }
 
-        if !handled {
-            let callback = handleMulticast.withLockedValue(\.self)
-            Task { [channel = context.channel] in
-                if let reply = try await callback(message) {
-                    try await channel.writeAndFlush(reply)
-                }
+        let callback = handleMulticast.withLockedValue(\.self)
+        Task { [channel = context.channel] in
+            if let reply = try await callback(message) {
+                try await channel.writeAndFlush(reply)
             }
         }
     }

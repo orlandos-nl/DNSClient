@@ -14,6 +14,22 @@ public struct SRVRecord: DNSResource {
     /// The domain name of the service. This can be used to resolve the IP address of the service.
     public let domainName: [DNSLabel]
 
+    public init(priority: UInt16, weight: UInt16, port: UInt16, domainName: [DNSLabel]) {
+        self.priority = priority
+        self.weight = weight
+        self.port = port
+        self.domainName = domainName
+    }
+
+    public init(priority: UInt16, weight: UInt16, port: UInt16, domainName: String) {
+        self.priority = priority
+        self.weight = weight
+        self.port = port
+        self.domainName = domainName
+            .split(separator: ".")
+            .map(DNSLabel.init)
+    }
+
     public static func read(from buffer: inout ByteBuffer, length: Int) -> SRVRecord? {
         guard
             let priority = buffer.readInteger(endianness: .big, as: UInt16.self),
