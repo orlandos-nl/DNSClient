@@ -1,22 +1,5 @@
 import NIO
 
-final class EnvelopeOutboundChannel: ChannelOutboundHandler {
-    typealias OutboundIn = ByteBuffer
-    typealias OutboundOut = AddressedEnvelope<ByteBuffer>
-    
-    let address: SocketAddress
-    
-    init(address: SocketAddress) {
-        self.address = address
-    }
-    
-    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let buffer = unwrapOutboundIn(data)
-        let envelope = AddressedEnvelope(remoteAddress: address, data: buffer)
-        context.write(wrapOutboundOut(envelope), promise: promise)
-    }
-}
-
 final class UInt16FrameDecoder: ByteToMessageDecoder {
     typealias InboundOut = ByteBuffer
     
@@ -47,8 +30,8 @@ final class UInt16FrameEncoder: MessageToByteEncoder {
     }
 }
 
-public final class DNSEncoder: ChannelOutboundHandler {
-    public typealias OutboundIn = Message
+public final class DNSTCPEncoder: ChannelOutboundHandler {
+    public typealias OutboundIn = AddressedEnvelope<Message>
     public typealias OutboundOut = ByteBuffer
 
     public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
@@ -56,12 +39,38 @@ public final class DNSEncoder: ChannelOutboundHandler {
         do {
             var labelIndices = [String: UInt16]()
             let data = try DNSEncoder.encodeMessage(
-                message,
+                message.data,
                 allocator: context.channel.allocator,
                 labelIndices: &labelIndices
             )
 
             context.write(wrapOutboundOut(data), promise: promise)
+        } catch {
+            context.fireErrorCaught(error)
+        }
+    }
+}
+
+
+public final class DNSEncoder: ChannelOutboundHandler {
+    public typealias OutboundIn = AddressedEnvelope<Message>
+    public typealias OutboundOut = AddressedEnvelope<ByteBuffer>
+
+    public func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let message = unwrapOutboundIn(data)
+        do {
+            var labelIndices = [String: UInt16]()
+            let data = try DNSEncoder.encodeMessage(
+                message.data,
+                allocator: context.channel.allocator,
+                labelIndices: &labelIndices
+            )
+
+            let encoded = AddressedEnvelope(
+                remoteAddress: message.remoteAddress,
+                data: data
+            )
+            context.write(wrapOutboundOut(encoded), promise: promise)
         } catch {
             context.fireErrorCaught(error)
         }

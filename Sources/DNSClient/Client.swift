@@ -11,6 +11,7 @@ public final class DNSClient: Resolver, Sendable {
     let channel: Channel
     let primaryAddress: SocketAddress
     let isMulticastBox = NIOLockedValueBox(false)
+    let config: [SocketAddress]
     let timeoutBox = NIOLockedValueBox<TimeAmount>(.seconds(30))
     internal var isMulticast: Bool {
         get { isMulticastBox.withLockedValue { $0 } }
@@ -31,13 +32,22 @@ public final class DNSClient: Resolver, Sendable {
         self.channel = channel
         self.primaryAddress = address
         self.dnsDecoder = decoder
+        self.config = [address]
     }
-    
+
+    internal init(channel: Channel, primaryAddress: SocketAddress, config: [SocketAddress], decoder: DNSDecoder) {
+        self.channel = channel
+        self.primaryAddress = primaryAddress
+        self.dnsDecoder = decoder
+        self.config = config
+    }
+
     /// Create a new `DNSClient` that will send queries to the specified address using your own `Channel`.
     public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext) {
         self.channel = channel
         self.primaryAddress = dnsServerAddress
         self.dnsDecoder = context.decoder
+        self.config = [dnsServerAddress]
     }
 
     deinit {

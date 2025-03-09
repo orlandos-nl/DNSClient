@@ -89,6 +89,7 @@ extension DNSClient {
         forHost address: String,
         type: DNSResourceType,
         additionalOptions: MessageOptions? = nil,
+        to remote: SocketAddress? = nil,
         perform: (AsyncThrowingStream<Message, any Error>) async throws -> T
     ) async throws -> T {
         let messageID = self.messageID.withLockedValue { id in
@@ -112,7 +113,7 @@ extension DNSClient {
         let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
         let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
 
-        let results = try await self.send(message)
+        let results = try await self.send(message, to: remote)
         return try await perform(results)
     }
 
@@ -146,7 +147,11 @@ extension DNSClient {
             self.dnsDecoder.messageCache.withLockedValue { cache in
                 cache[message.header.id] = SentQuery(message: message, continuation: continuation)
             }
-            self.channel.writeAndFlush(message, promise: nil)
+            let messageWithAddress = AddressedEnvelope(
+                remoteAddress: address ?? self.primaryAddress,
+                data: message
+            )
+            self.channel.writeAndFlush(messageWithAddress, promise: nil)
 
             self.loop.scheduleTask(in: self.timeout) {
                 continuation.finish()

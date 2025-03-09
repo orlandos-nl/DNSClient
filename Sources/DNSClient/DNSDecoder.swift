@@ -1,18 +1,6 @@
 import NIO
 import NIOConcurrencyHelpers
 
-final class EnvelopeInboundChannel: ChannelInboundHandler {
-    typealias InboundIn = AddressedEnvelope<ByteBuffer>
-    typealias InboundOut = ByteBuffer
-    
-    init() {}
-    
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let buffer = unwrapInboundIn(data).data
-        context.fireChannelRead(wrapInboundOut(buffer))
-    }
-}
-
 public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     let group: EventLoopGroup
     let messageCache = NIOLockedValueBox<[UInt16: SentQuery]>([:])
@@ -26,14 +14,14 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
         self.group = group
     }
 
-    public typealias InboundIn = ByteBuffer
-    public typealias OutboundOut = Never
-    
+    public typealias InboundIn = AddressedEnvelope<ByteBuffer>
+
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let envelope = unwrapInboundIn(data)
         let message: Message
 
         do {
-            message = try Self.parse(unwrapInboundIn(data))
+            message = try Self.parse(envelope.data)
         } catch {
             context.fireErrorCaught(error)
             return

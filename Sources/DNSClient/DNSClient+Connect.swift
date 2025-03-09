@@ -32,19 +32,59 @@ extension DNSClient {
             return group.next().makeFailedFuture(error)
         }
     }
-    
+
+    /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
+    /// - parameters:
+    ///    - group: EventLoops to use
+    public static func connectMulticastClient(
+        on group: EventLoopGroup,
+        queryTimeout: TimeAmount = .seconds(5),
+        onMulticastMessage: @escaping HandleMulticastMessage = { _ in nil }
+    ) async throws -> DNSClient {
+        let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
+
+        let dnsDecoder = DNSDecoder(group: group)
+
+        let bootstrap = DatagramBootstrap(group: group)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelInitializer { channel in
+                return channel.pipeline.addHandlers(
+                    DNSEncoder(),
+                    dnsDecoder
+                )
+            }
+
+        let ipv4 = address.protocol.rawValue == PF_INET
+
+        return try await bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 5353).map { channel in
+            let client = DNSClient(
+                channel: channel,
+                address: address,
+                decoder: dnsDecoder
+            )
+
+            dnsDecoder.mainClient = client
+            return client
+        }.get()
+    }
+
     /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
     /// - parameters:
     ///    - group: EventLoops to use
     public static func connectMulticast(
         on group: EventLoopGroup,
         queryTimeout: TimeAmount = .seconds(5),
-        onMulticastMessage: @escaping HandleMulticastMessage = { _ in nil }
+        onMulticastMessage: @escaping HandleMulticastMessage
     ) -> EventLoopFuture<DNSClient> {
         do {
             let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
             
-            return connect(on: group, config: [address]).flatMap { client in
+            return connect(
+                on: group,
+                localPort: 5353,
+                config: [address]
+            ).flatMap { client in
                 let channel = client.channel as! MulticastChannel
                 client.isMulticast = true
                 client.timeout = queryTimeout
@@ -96,16 +136,10 @@ extension DNSClient {
     ///   - remoteAddress: The address to send the DNS requests to - based on NIO's AddressedEnvelope.
     /// - Returns: A future that will be completed when the channel is ready to use.
     public static func initializeChannel(_ channel: Channel, context: DNSClientContext, asEnvelopeTo remoteAddress: SocketAddress? = nil) -> EventLoopFuture<Void> {
-        if let remoteAddress = remoteAddress {
-            return channel.pipeline.addHandlers(
-                EnvelopeInboundChannel(),
-                context.decoder,
-                EnvelopeOutboundChannel(address: remoteAddress),
-                DNSEncoder()
-            )
-        } else {
-            return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
-        }
+        return channel.pipeline.addHandlers(
+            DNSEncoder(),
+            context.decoder
+        )
     }
 
     /// Connect to the dns server and return a future with the client. This method will use UDP.
@@ -113,7 +147,11 @@ extension DNSClient {
     ///   - group: EventLoops to use
     ///  - config: DNS servers to connect to
     /// - returns: Future with the NioDNS client
-    public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
+    public static func connect(
+        on group: EventLoopGroup,
+        localPort: Int = 0,
+        config: [SocketAddress]
+    ) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
             return group.next().makeFailedFuture(MissingNameservers())
         }
@@ -125,19 +163,18 @@ extension DNSClient {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
-                    EnvelopeOutboundChannel(address: address),
                     DNSEncoder(),
-                    EnvelopeInboundChannel(),
                     dnsDecoder
                 )
         }
 
 		let ipv4 = address.protocol.rawValue == PF_INET
 		
-        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
+        return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: localPort).map { channel in
             let client = DNSClient(
                 channel: channel,
-                address: address,
+                primaryAddress: address,
+                config: config,
                 decoder: dnsDecoder
             )
 
@@ -162,8 +199,9 @@ extension DNSClient {
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
                     MessageToByteHandler(UInt16FrameEncoder()),
-                    DNSEncoder(),
+                    DNSTCPEncoder(),
                     ByteToMessageHandler(UInt16FrameDecoder()),
+                    RawMessageInboundChannel(address: address),
                     dnsDecoder
                 )
             }
@@ -171,7 +209,8 @@ extension DNSClient {
         return bootstrap.connect(to: address).map { channel in
             let client = DNSClient(
                 channel: channel,
-                address: address,
+                primaryAddress: address,
+                config: config,
                 decoder: dnsDecoder
             )
             
@@ -219,13 +258,14 @@ extension DNSClient {
         let dnsDecoder = DNSDecoder(group: group)
         
         return NIOTSDatagramBootstrap(group: group).channelInitializer { channel in
-            return channel.pipeline.addHandlers(DNSEncoder(), dnsDecoder)
+            return channel.pipeline.addHandlers(DNSTCPEncoder(), RawMessageInboundChannel(address: address), dnsDecoder)
         }
         .connect(host: ipAddress, port: port)
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
-                address: address,
+                primaryAddress: address,
+                config: config,
                 decoder: dnsDecoder
             )
 
@@ -269,12 +309,13 @@ extension DNSClient {
         }
 
         let dnsDecoder = DNSDecoder(group: group)
-        
+
         return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
             return channel.pipeline.addHandlers(
                 MessageToByteHandler(UInt16FrameEncoder()),
-                DNSEncoder(),
+                DNSTCPEncoder(),
                 ByteToMessageHandler(UInt16FrameDecoder()),
+                RawMessageInboundChannel(address: address),
                 dnsDecoder
             )
         }
@@ -282,7 +323,8 @@ extension DNSClient {
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
-                address: address,
+                primaryAddress: address,
+                config: config,
                 decoder: dnsDecoder
             )
 
@@ -304,6 +346,22 @@ extension DNSClient {
         } catch {
             return group.next().makeFailedFuture(UnableToParseConfig())
         }
+    }
+}
+
+final class RawMessageInboundChannel: ChannelInboundHandler {
+    typealias InboundIn = ByteBuffer
+    typealias InboundOut = AddressedEnvelope<ByteBuffer>
+    let address: SocketAddress
+
+    init(address: SocketAddress) {
+        self.address = address
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let buffer = unwrapInboundIn(data)
+        let message = AddressedEnvelope(remoteAddress: address, data: buffer)
+        context.fireChannelRead(wrapInboundOut(message))
     }
 }
 #endif
