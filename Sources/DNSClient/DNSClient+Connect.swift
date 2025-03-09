@@ -38,7 +38,8 @@ extension DNSClient {
     ///    - group: EventLoops to use
     public static func connectMulticast(
         on group: EventLoopGroup,
-        queryTimeout: TimeAmount = .seconds(5)
+        queryTimeout: TimeAmount = .seconds(5),
+        onMulticastMessage: @escaping HandleMulticastMessage = { _ in nil }
     ) -> EventLoopFuture<DNSClient> {
         do {
             let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
@@ -47,6 +48,9 @@ extension DNSClient {
                 let channel = client.channel as! MulticastChannel
                 client.isMulticast = true
                 client.timeout = queryTimeout
+                client.dnsDecoder.handleMulticast.withLockedValue { handler in
+                    handler = onMulticastMessage
+                }
                 return channel.joinGroup(address).map { client }
             }
         } catch {
@@ -121,10 +125,10 @@ extension DNSClient {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
-                    EnvelopeInboundChannel(),
-                    dnsDecoder,
                     EnvelopeOutboundChannel(address: address),
-                    DNSEncoder()
+                    DNSEncoder(),
+                    EnvelopeInboundChannel(),
+                    dnsDecoder
                 )
         }
 
@@ -157,10 +161,10 @@ extension DNSClient {
         let bootstrap = ClientBootstrap(group: group)
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
-                    ByteToMessageHandler(UInt16FrameDecoder()),
                     MessageToByteHandler(UInt16FrameEncoder()),
-                    dnsDecoder,
-                    DNSEncoder()
+                    DNSEncoder(),
+                    ByteToMessageHandler(UInt16FrameDecoder()),
+                    dnsDecoder
                 )
             }
         
@@ -215,7 +219,7 @@ extension DNSClient {
         let dnsDecoder = DNSDecoder(group: group)
         
         return NIOTSDatagramBootstrap(group: group).channelInitializer { channel in
-            return channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+            return channel.pipeline.addHandlers(DNSEncoder(), dnsDecoder)
         }
         .connect(host: ipAddress, port: port)
         .map { channel -> DNSClient in
@@ -268,10 +272,10 @@ extension DNSClient {
         
         return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
             return channel.pipeline.addHandlers(
-                ByteToMessageHandler(UInt16FrameDecoder()),
                 MessageToByteHandler(UInt16FrameEncoder()),
-                dnsDecoder,
-                DNSEncoder()
+                DNSEncoder(),
+                ByteToMessageHandler(UInt16FrameDecoder()),
+                dnsDecoder
             )
         }
         .connect(to: address)

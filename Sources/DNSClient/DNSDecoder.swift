@@ -17,6 +17,9 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     let group: EventLoopGroup
     let messageCache = NIOLockedValueBox<[UInt16: SentQuery]>([:])
     let clients = NIOLockedValueBox<[ObjectIdentifier: DNSClient]>([:])
+    let handleMulticast = NIOLockedValueBox<DNSClient.HandleMulticastMessage>({ _ in
+        return nil
+    })
     weak var mainClient: DNSClient?
 
     public init(group: EventLoopGroup) {
@@ -36,17 +39,26 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
-        if !message.header.options.contains(.answer) {
-            return
+        var handled = false
+        if message.header.options.contains(.answer) {
+            handled = messageCache.withLockedValue { cache in
+                guard let query = cache[message.header.id] else {
+                    return false
+                }
+
+                query.continuation.yield(message)
+                cache[message.header.id] = nil
+                return true
+            }
         }
 
-        messageCache.withLockedValue { cache in
-            guard let query = cache[message.header.id] else {
-                return
+        if !handled {
+            let callback = handleMulticast.withLockedValue(\.self)
+            Task { [channel = context.channel] in
+                if let reply = try await callback(message) {
+                    try await channel.writeAndFlush(reply)
+                }
             }
-
-            query.continuation.yield(message)
-            cache[message.header.id] = nil
         }
     }
 
