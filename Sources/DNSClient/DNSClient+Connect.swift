@@ -64,6 +64,8 @@ extension DNSClient {
                 decoder: dnsDecoder
             )
 
+            client.isMulticast = true
+            client.timeout = queryTimeout
             dnsDecoder.mainClient = client
             return client
         }.get()
