@@ -85,11 +85,12 @@ extension DNSClient {
     ///     - type: The resource you want to request
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
-    public func sendQuery(
+    public func withResults<T: Sendable>(
         forHost address: String,
         type: DNSResourceType,
-        additionalOptions: MessageOptions? = nil
-    ) async throws -> AsyncThrowingStream<Message, any Error> {
+        additionalOptions: MessageOptions? = nil,
+        perform: (AsyncThrowingStream<Message, any Error>) async throws -> T
+    ) async throws -> T {
         let messageID = self.messageID.withLockedValue { id in
             let newID = id &+ 1
             id = newID
@@ -111,7 +112,8 @@ extension DNSClient {
         let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
         let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
 
-        return try await self.send(message)
+        let results = try await self.send(message)
+        return try await perform(results)
     }
 
     /// Send a question to the dns host
@@ -127,12 +129,13 @@ extension DNSClient {
         additionalOptions: MessageOptions? = nil
     ) -> EventLoopFuture<Message> {
         self.channel.eventLoop.makeFutureWithTask {
-            let results = try await self.sendQuery(forHost: address, type: type, additionalOptions: additionalOptions)
-            for try await result in results {
-                return result
+            try await self.withResults(forHost: address, type: type, additionalOptions: additionalOptions) { results in
+                for try await result in results {
+                    return result
+                }
+                
+                throw DNSTimeoutError()
             }
-
-            throw DNSTimeoutError()
         }
     }
 
