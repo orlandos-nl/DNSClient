@@ -73,7 +73,7 @@ extension DNSClient {
         dnsDecoder.messageCache.withLockedValue { cache in
             for (id, query) in cache {
                 cache[id] = nil
-                query.promise.fail(CancelError())
+                query.continuation.finish(throwing: CancellationError())
             }
         }
     }
@@ -85,50 +85,75 @@ extension DNSClient {
     ///     - type: The resource you want to request
     ///     - additionalOptions: Additional message options
     /// - returns: A future with the response message
-    public func sendQuery(forHost address: String, type: DNSResourceType, additionalOptions: MessageOptions? = nil) -> EventLoopFuture<Message> {
-        channel.eventLoop.flatSubmit {
-            let messageID = self.messageID.withLockedValue { id in
-                let newID = id &+ 1
-                id = newID
-                return id
+    public func sendQuery(
+        forHost address: String,
+        type: DNSResourceType,
+        additionalOptions: MessageOptions? = nil
+    ) async throws -> AsyncThrowingStream<Message, any Error> {
+        let messageID = self.messageID.withLockedValue { id in
+            let newID = id &+ 1
+            id = newID
+            return id
+        }
+
+        var options: MessageOptions = [.standardQuery]
+
+        if !self.isMulticast {
+            options.insert(.recursionDesired)
+        }
+
+        if let additionalOptions = additionalOptions {
+            options.insert(additionalOptions)
+        }
+
+        let header = DNSMessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
+        let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
+        let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
+        let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
+
+        return try await self.send(message)
+    }
+
+    /// Send a question to the dns host
+    ///
+    /// - parameters:
+    ///     - address: The hostname address to request a certain resource from
+    ///     - type: The resource you want to request
+    ///     - additionalOptions: Additional message options
+    /// - returns: A future with the response message
+    public func sendQuery(
+        forHost address: String,
+        type: DNSResourceType,
+        additionalOptions: MessageOptions? = nil
+    ) -> EventLoopFuture<Message> {
+        self.channel.eventLoop.makeFutureWithTask {
+            let results = try await self.sendQuery(forHost: address, type: type, additionalOptions: additionalOptions)
+            for try await result in results {
+                return result
             }
-            
-            var options: MessageOptions = [.standardQuery]
-            
-            if !self.isMulticast {
-                options.insert(.recursionDesired)
-            }
-            
-            if let additionalOptions = additionalOptions {
-                options.insert(additionalOptions)
-            }
-            
-            let header = DNSMessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-            let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
-            let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
-            let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
-            
-            return self.send(message)
+
+            throw DNSTimeoutError()
         }
     }
 
-    func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
-        let promise: EventLoopPromise<Message> = loop.makePromise()
-        
-        return loop.flatSubmit {
+    func send(_ message: Message, to address: SocketAddress? = nil) async throws -> AsyncThrowingStream<Message, any Error> {
+        let (stream, continuation) = AsyncThrowingStream<Message, any Error>.makeStream()
+
+        try await loop.submit {
             self.dnsDecoder.messageCache.withLockedValue { cache in
-                cache[message.header.id] = SentQuery(message: message, promise: promise)
+                cache[message.header.id] = SentQuery(message: message, continuation: continuation)
             }
             self.channel.writeAndFlush(message, promise: nil)
-            
-            struct DNSTimeoutError: Error {}
-            
-            self.loop.scheduleTask(in: .seconds(30)) {
-                promise.fail(DNSTimeoutError())
-            }
 
-            return promise.futureResult
-        }
+            self.loop.scheduleTask(in: self.timeout) {
+                continuation.finish()
+                self.dnsDecoder.messageCache.withLockedValue { cache in
+                    cache[message.header.id] = nil
+                }
+            }
+        }.get()
+
+        return stream
     }
 
     /// Request SRV records from a host

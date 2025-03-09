@@ -8,12 +8,17 @@ public final class DNSClient: Resolver, Sendable {
     let dnsDecoder: DNSDecoder
     let channel: Channel
     let primaryAddress: SocketAddress
-    private let isMulticastBox = NIOLockedValueBox(false)
+    let isMulticastBox = NIOLockedValueBox(false)
+    let timeoutBox = NIOLockedValueBox<TimeAmount>(.seconds(30))
     internal var isMulticast: Bool {
         get { isMulticastBox.withLockedValue { $0 } }
         set { isMulticastBox.withLockedValue { $0 = newValue } }
     }
-    
+    internal var timeout: TimeAmount {
+        get { timeoutBox.withLockedValue { $0 } }
+        set { timeoutBox.withLockedValue { $0 = newValue } }
+    }
+
     var loop: EventLoop {
         return channel.eventLoop
     }
@@ -50,5 +55,5 @@ public struct DNSClientContext {
 
 struct SentQuery {
     let message: Message
-    let promise: EventLoopPromise<Message>
+    let continuation: AsyncThrowingStream<Message, any Error>.Continuation
 }

@@ -36,13 +36,17 @@ extension DNSClient {
     /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
     /// - parameters:
     ///    - group: EventLoops to use
-    public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
+    public static func connectMulticast(
+        on group: EventLoopGroup,
+        queryTimeout: TimeAmount = .seconds(5)
+    ) -> EventLoopFuture<DNSClient> {
         do {
             let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
             
             return connect(on: group, config: [address]).flatMap { client in
                 let channel = client.channel as! MulticastChannel
                 client.isMulticast = true
+                client.timeout = queryTimeout
                 return channel.joinGroup(address).map { client }
             }
         } catch {

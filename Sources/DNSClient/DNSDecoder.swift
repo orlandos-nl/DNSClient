@@ -45,7 +45,7 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
                 return
             }
 
-            query.promise.succeed(message)
+            query.continuation.yield(message)
             cache[message.header.id] = nil
         }
     }
@@ -97,7 +97,7 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     public func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
         messageCache.withLockedValue { cache in
             for query in cache.values {
-                query.promise.fail(error)
+                query.continuation.finish(throwing: error)
             }
 
             cache = [:]
