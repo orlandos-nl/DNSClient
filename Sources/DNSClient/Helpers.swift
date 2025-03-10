@@ -33,7 +33,12 @@ extension ByteBuffer {
     }
 
     mutating func readLabels() -> [DNSLabel]? {
+        return readLabels(visitedOffsets: [])
+    }
+    
+    private mutating func readLabels(visitedOffsets: Set<Int>) -> [DNSLabel]? {
         var labels = [DNSLabel]()
+        var myVisitedOffsets = visitedOffsets
 
         while let length = readInteger(endianness: .big, as: UInt8.self) {
             if length == 0 {
@@ -54,15 +59,22 @@ extension ByteBuffer {
                 }
 
                 offset = offset & 0b00111111_11111111
-
+                
                 guard offset >= 0, offset <= writerIndex else {
                     return nil
                 }
+                
+                // Check for cycles
+                let intOffset = Int(offset)
+                guard !myVisitedOffsets.contains(intOffset) else {
+                    return nil
+                }
+                myVisitedOffsets.insert(intOffset)
 
                 let oldReaderIndex = self.readerIndex
                 self.moveReaderIndex(to: Int(offset))
 
-                guard let referencedLabels = readLabels() else {
+                guard let referencedLabels = readLabels(visitedOffsets: myVisitedOffsets) else {
                     return nil
                 }
 
