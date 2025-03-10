@@ -36,8 +36,9 @@ extension DNSClient {
     /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
     /// - parameters:
     ///    - group: EventLoops to use
-    public static func connectMulticastClient(
+    public static func connectMulticast(
         on group: EventLoopGroup,
+        port: Int = 5353,
         queryTimeout: TimeAmount = .seconds(5),
         onMulticastMessage: @escaping HandleMulticastMessage = { _ in nil }
     ) async throws -> DNSClient {
@@ -57,7 +58,7 @@ extension DNSClient {
 
         let ipv4 = address.protocol.rawValue == PF_INET
 
-        return try await bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 5353).map { channel in
+        return try await bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: port).map { channel in
             let client = DNSClient(
                 channel: channel,
                 address: address,
@@ -69,35 +70,6 @@ extension DNSClient {
             dnsDecoder.mainClient = client
             return client
         }.get()
-    }
-
-    /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
-    /// - parameters:
-    ///    - group: EventLoops to use
-    public static func connectMulticast(
-        on group: EventLoopGroup,
-        queryTimeout: TimeAmount = .seconds(5),
-        onMulticastMessage: @escaping HandleMulticastMessage
-    ) -> EventLoopFuture<DNSClient> {
-        do {
-            let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
-            
-            return connect(
-                on: group,
-                localPort: 5353,
-                config: [address]
-            ).flatMap { client in
-                let channel = client.channel as! MulticastChannel
-                client.isMulticast = true
-                client.timeout = queryTimeout
-                client.dnsDecoder.handleMulticast.withLockedValue { handler in
-                    handler = onMulticastMessage
-                }
-                return channel.joinGroup(address).map { client }
-            }
-        } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
-        }
     }
     
     /// Connect to the dns server using TCP
