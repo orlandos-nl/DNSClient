@@ -468,7 +468,7 @@ extension ByteBuffer {
             if let labelIndex = labelIndices[key] {
                 written += writeInteger(labelIndex | 0xc000)
                 return written
-            } else {
+            } else if !label.label.isEmpty {
                 // if no position exists for this combination of labels output the first label
                 labelIndices[key] = numericCast(writerIndex)
                 written += writeInteger(UInt8(label.label.count))
