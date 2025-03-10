@@ -461,9 +461,9 @@ extension ByteBuffer {
         var written = 0
         var labels = labels
         while !labels.isEmpty {
-            let label = labels.removeFirst()
             // use combined labels as a key for a position in the packet
             let key = labels.string
+            let label = labels.removeFirst()
             // if position exists output position or'ed with 0xc000 and return
             if let labelIndex = labelIndices[key] {
                 written += writeInteger(labelIndex | 0xc000)
