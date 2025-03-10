@@ -98,6 +98,7 @@ extension ByteBuffer {
             return nil
         }
 
+
         guard
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
@@ -115,11 +116,11 @@ extension ByteBuffer {
         labelIndices: inout [String: UInt16]
     ) throws {
         writeCompressedLabels(record.domainName, labelIndices: &labelIndices)
-        writeInteger(record.dataType)
-        writeInteger(record.dataClass)
-        writeInteger(record.ttl)
+        writeInteger(record.dataType, endianness: .big)
+        writeInteger(record.dataClass, endianness: .big)
+        writeInteger(record.ttl, endianness: .big)
 
-        try writeLengthPrefixed(as: UInt16.self) { buffer in
+        try writeLengthPrefixed(endianness: .big, as: UInt16.self) { buffer in
             record.resource.write(into: &buffer, labelIndices: &labelIndices)
         }
     }
@@ -155,8 +156,8 @@ extension ByteBuffer {
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
             let ttl = readInteger(endianness: .big, as: UInt32.self),
             let dataLength = readInteger(endianness: .big, as: UInt16.self)
-            else {
-                return nil
+        else {
+            return nil
         }
         
         let newIndex = readerIndex + Int(dataLength)

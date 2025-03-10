@@ -44,9 +44,9 @@ public struct SRVRecord: DNSResource {
     }
 
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        var length = buffer.writeInteger(priority)
-        length += buffer.writeInteger(weight)
-        length += buffer.writeInteger(port)
+        var length = buffer.writeInteger(priority, endianness: .big)
+        length += buffer.writeInteger(weight, endianness: .big)
+        length += buffer.writeInteger(port, endianness: .big)
         return length + buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
     }
 }
