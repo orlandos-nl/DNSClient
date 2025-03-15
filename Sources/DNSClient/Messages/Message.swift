@@ -323,6 +323,11 @@ public struct AAAARecord: DNSResource {
     /// The address of the record. This is a 128-bit integer.
     public let address: [UInt8]
 
+    public init(address: [UInt8]) {
+        precondition(address.count == 16)
+        self.address = address
+    }
+
     /// The address of the record as a string.
     public var stringAddress: String {
         String(format: "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
