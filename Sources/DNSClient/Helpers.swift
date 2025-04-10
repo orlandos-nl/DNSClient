@@ -33,7 +33,12 @@ extension ByteBuffer {
     }
 
     mutating func readLabels() -> [DNSLabel]? {
+        return readLabels(visitedOffsets: [])
+    }
+    
+    private mutating func readLabels(visitedOffsets: Set<Int>) -> [DNSLabel]? {
         var labels = [DNSLabel]()
+        var myVisitedOffsets = visitedOffsets
 
         while let length = readInteger(endianness: .big, as: UInt8.self) {
             if length == 0 {
@@ -54,15 +59,22 @@ extension ByteBuffer {
                 }
 
                 offset = offset & 0b00111111_11111111
-
+                
                 guard offset >= 0, offset <= writerIndex else {
                     return nil
                 }
+                
+                // Check for cycles
+                let intOffset = Int(offset)
+                guard !myVisitedOffsets.contains(intOffset) else {
+                    return nil
+                }
+                myVisitedOffsets.insert(intOffset)
 
                 let oldReaderIndex = self.readerIndex
                 self.moveReaderIndex(to: Int(offset))
 
-                guard let referencedLabels = readLabels() else {
+                guard let referencedLabels = readLabels(visitedOffsets: myVisitedOffsets) else {
                     return nil
                 }
 
@@ -86,6 +98,7 @@ extension ByteBuffer {
             return nil
         }
 
+
         guard
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
@@ -103,11 +116,11 @@ extension ByteBuffer {
         labelIndices: inout [String: UInt16]
     ) throws {
         writeCompressedLabels(record.domainName, labelIndices: &labelIndices)
-        writeInteger(record.dataType)
-        writeInteger(record.dataClass)
-        writeInteger(record.ttl)
+        writeInteger(record.dataType, endianness: .big)
+        writeInteger(record.dataClass, endianness: .big)
+        writeInteger(record.ttl, endianness: .big)
 
-        try writeLengthPrefixed(as: UInt16.self) { buffer in
+        try writeLengthPrefixed(endianness: .big, as: UInt16.self) { buffer in
             record.resource.write(into: &buffer, labelIndices: &labelIndices)
         }
     }
@@ -143,8 +156,8 @@ extension ByteBuffer {
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
             let ttl = readInteger(endianness: .big, as: UInt32.self),
             let dataLength = readInteger(endianness: .big, as: UInt16.self)
-            else {
-                return nil
+        else {
+            return nil
         }
         
         let newIndex = readerIndex + Int(dataLength)

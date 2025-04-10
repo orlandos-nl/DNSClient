@@ -1,52 +1,50 @@
 import NIO
 import NIOConcurrencyHelpers
 
-final class EnvelopeInboundChannel: ChannelInboundHandler {
-    typealias InboundIn = AddressedEnvelope<ByteBuffer>
-    typealias InboundOut = ByteBuffer
-    
-    init() {}
-    
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let buffer = unwrapInboundIn(data).data
-        context.fireChannelRead(wrapInboundOut(buffer))
-    }
-}
-
 public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     let group: EventLoopGroup
     let messageCache = NIOLockedValueBox<[UInt16: SentQuery]>([:])
     let clients = NIOLockedValueBox<[ObjectIdentifier: DNSClient]>([:])
+    let handleMulticast = NIOLockedValueBox<DNSClient.HandleMulticastMessage>({ _ in
+        return nil
+    })
     weak var mainClient: DNSClient?
 
     public init(group: EventLoopGroup) {
         self.group = group
     }
 
-    public typealias InboundIn = ByteBuffer
-    public typealias OutboundOut = Never
-    
+    public typealias InboundIn = AddressedEnvelope<ByteBuffer>
+
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let envelope = unwrapInboundIn(data)
         let message: Message
 
         do {
-            message = try Self.parse(unwrapInboundIn(data))
+            message = try Self.parse(envelope.data)
         } catch {
             context.fireErrorCaught(error)
             return
         }
 
-        if !message.header.options.contains(.answer) {
-            return
-        }
+        if message.header.options.contains(.answer) {
+            return messageCache.withLockedValue { cache in
+                guard let query = cache[message.header.id] else {
+                    return
+                }
 
-        messageCache.withLockedValue { cache in
-            guard let query = cache[message.header.id] else {
+                query.continuation.yield(message)
+                cache[message.header.id] = nil
                 return
             }
+        }
 
-            query.promise.succeed(message)
-            cache[message.header.id] = nil
+        let callback = handleMulticast.withLockedValue(\.self)
+        Task { [channel = context.channel, address = envelope.remoteAddress] in
+            if let reply = try await callback(message) {
+                let envelope = AddressedEnvelope(remoteAddress: address, data: reply)
+                try await channel.writeAndFlush(envelope)
+            }
         }
     }
 
@@ -97,7 +95,7 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     public func errorCaught(context ctx: ChannelHandlerContext, error: Error) {
         messageCache.withLockedValue { cache in
             for query in cache.values {
-                query.promise.fail(error)
+                query.continuation.finish(throwing: error)
             }
 
             cache = [:]
