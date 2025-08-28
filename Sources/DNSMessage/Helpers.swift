@@ -1,7 +1,7 @@
-import NIO
+import NIOCore
 
 extension ByteBuffer {
-    mutating func write(_ header: DNSMessageHeader) {
+    package mutating func write(_ header: DNSMessageHeader) {
         writeInteger(header.id, endianness: .big)
         writeInteger(header.options.rawValue, endianness: .big)
         writeInteger(header.questionCount, endianness: .big)
@@ -10,7 +10,7 @@ extension ByteBuffer {
         writeInteger(header.additionalRecordCount, endianness: .big)
     }
 
-    mutating func readHeader() -> DNSMessageHeader? {
+    package mutating func readHeader() -> DNSMessageHeader? {
         guard
             let id = readInteger(endianness: .big, as: UInt16.self),
             let options = readInteger(endianness: .big, as: UInt16.self),
@@ -32,7 +32,7 @@ extension ByteBuffer {
         )
     }
 
-    mutating func readLabels() -> [DNSLabel]? {
+    package mutating func readLabels() -> [DNSLabel]? {
         var labels = [DNSLabel]()
 
         while let length = readInteger(endianness: .big, as: UInt8.self) {
@@ -81,7 +81,7 @@ extension ByteBuffer {
         return labels
     }
 
-    mutating func readQuestion() -> QuestionSection? {
+    package mutating func readQuestion() -> QuestionSection? {
         guard let labels = readLabels() else {
             return nil
         }
@@ -98,7 +98,7 @@ extension ByteBuffer {
         return QuestionSection(labels: labels, type: type, questionClass: dataClass)
     }
 
-    mutating func writeRecord<RecordType: DNSResource>(
+    package mutating func writeRecord<RecordType: DNSResource>(
         _ record: ResourceRecord<RecordType>,
         labelIndices: inout [String: UInt16]
     ) throws {
@@ -112,7 +112,7 @@ extension ByteBuffer {
         }
     }
 
-    mutating func writeAnyRecord(
+    package mutating func writeAnyRecord(
         _ record: Record,
         labelIndices: inout [String: UInt16]
     ) throws {
@@ -136,7 +136,7 @@ extension ByteBuffer {
         }
     }
 
-    mutating func readRecord() -> Record? {
+    package mutating func readRecord() -> Record? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),
@@ -230,7 +230,7 @@ extension ByteBuffer {
         return .other(other)
     }
 
-    mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
+    package mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),

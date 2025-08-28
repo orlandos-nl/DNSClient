@@ -1,3 +1,4 @@
+import DNSMessage
 import NIO
 
 final class EnvelopeOutboundChannel: ChannelOutboundHandler {

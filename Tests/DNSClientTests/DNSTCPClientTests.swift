@@ -1,3 +1,4 @@
+import DNSMessage
 import NIO
 import XCTest
 

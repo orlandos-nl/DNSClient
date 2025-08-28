@@ -16,7 +16,8 @@ let package = Package(
             targets: [
                 "DNSClient"
             ]
-        )
+        ),
+        .library(name: "DNSMessage", targets: ["DNSMessage"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -38,6 +39,13 @@ let package = Package(
             dependencies: [
                 .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
                 .product(name: "NIO", package: "swift-nio"),
+                .target(name: "DNSMessage"),
+            ]
+        ),
+        .target(
+            name: "DNSMessage",
+            dependencies: [
+                .product(name: "NIO", package: "swift-nio")
             ]
         ),
     ]
