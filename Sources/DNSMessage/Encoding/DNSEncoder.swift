@@ -112,6 +112,23 @@ public struct DNSEncoder {
         self.namePointers = []
     }
 
+    private mutating func writeDNSHeader(_ header: DNSHeader) -> Int {
+        var written = 0
+        var completeFlags = header.flags
+
+        completeFlags.encodeOpcode(header.opcode)
+        completeFlags.encodeResponseCode(header.responseCode)
+
+        written += self.buffer.writeInteger(header.id)
+        written += self.buffer.writeInteger(completeFlags.rawValue)
+        written += self.buffer.writeInteger(header.questionCount)
+        written += self.buffer.writeInteger(header.answerCount)
+        written += self.buffer.writeInteger(header.authorityCount)
+        written += self.buffer.writeInteger(header.additionalDataCount)
+
+        return written
+    }
+
     private mutating func addNamePointer(name: DNSName, offset: Int) {
         precondition(offset <= UInt16.max)
         precondition(offset >= UInt16.min)

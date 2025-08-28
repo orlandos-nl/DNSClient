@@ -37,13 +37,33 @@ public struct DNSHeader: Sendable {
     public init(
         id: UInt16,
         flags: DNSHeaderFlags,
-        opcode: DNSOpcode,
-        responseCode: DNSResponseCode
+        opcode: DNSOpcode = .query,
+        responseCode: DNSResponseCode = .noError
     ) {
         self.id = id
         self.flags = flags
         self.opcode = opcode
         self.responseCode = responseCode
+    }
+
+    internal init(
+        id: UInt16,
+        flags: DNSHeaderFlags,
+        opcode: DNSOpcode,
+        responseCode: DNSResponseCode,
+        questionCount: UInt16,
+        answerCount: UInt16,
+        authorityCount: UInt16,
+        additionalDataCount: UInt16,
+    ) {
+        self.id = id
+        self.flags = flags
+        self.opcode = opcode
+        self.responseCode = responseCode
+        self.questionCount = questionCount
+        self.answerCount = answerCount
+        self.authorityCount = authorityCount
+        self.additionalDataCount = additionalDataCount
     }
 }
 

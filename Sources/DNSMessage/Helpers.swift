@@ -1,37 +1,6 @@
 import NIOCore
 
 extension ByteBuffer {
-    package mutating func write(_ header: DNSMessageHeader) {
-        writeInteger(header.id, endianness: .big)
-        writeInteger(header.options.rawValue, endianness: .big)
-        writeInteger(header.questionCount, endianness: .big)
-        writeInteger(header.answerCount, endianness: .big)
-        writeInteger(header.authorityCount, endianness: .big)
-        writeInteger(header.additionalRecordCount, endianness: .big)
-    }
-
-    package mutating func readHeader() -> DNSMessageHeader? {
-        guard
-            let id = readInteger(endianness: .big, as: UInt16.self),
-            let options = readInteger(endianness: .big, as: UInt16.self),
-            let questionCount = readInteger(endianness: .big, as: UInt16.self),
-            let answerCount = readInteger(endianness: .big, as: UInt16.self),
-            let authorityCount = readInteger(endianness: .big, as: UInt16.self),
-            let additionalRecordCount = readInteger(endianness: .big, as: UInt16.self)
-        else {
-            return nil
-        }
-
-        return DNSMessageHeader(
-            id: id,
-            options: MessageOptions(rawValue: options),
-            questionCount: questionCount,
-            answerCount: answerCount,
-            authorityCount: authorityCount,
-            additionalRecordCount: additionalRecordCount
-        )
-    }
-
     package mutating func readQuestion() -> QuestionSection? {
         guard let labels = readLabels() else {
             return nil

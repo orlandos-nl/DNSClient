@@ -50,4 +50,35 @@ public struct DNSDecoder {
 
         throw DNSMessageError.insufficientData(expected: 1, available: buffer.readableBytes)
     }
+
+    internal mutating func readDNSHeader() throws -> DNSHeader {
+        // Read the fields in order: ID, FLAGS, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT
+        guard let id = self.buffer.readInteger(as: UInt16.self),
+            let rawFlags = self.buffer.readInteger(as: UInt16.self),
+            let questionCount = self.buffer.readInteger(as: UInt16.self),
+            let answerCount = self.buffer.readInteger(as: UInt16.self),
+            let authorityCount = self.buffer.readInteger(as: UInt16.self),
+            let additionalDataCount = self.buffer.readInteger(as: UInt16.self)
+        else {
+            throw DNSMessageError.insufficientData(expected: 12, available: buffer.readableBytes)
+        }
+
+        // Create flags with the raw value to extract opcode and response code
+        var flags = DNSHeaderFlags(rawValue: rawFlags)
+
+        // Extract opcode and response code from the combined flags field (this cleans the bits)
+        let opcode = flags.decodeOpcode()
+        let responseCode = flags.decodeResponseCode()
+
+        return DNSHeader(
+            id: id,
+            flags: flags,
+            opcode: opcode,
+            responseCode: responseCode,
+            questionCount: questionCount,
+            answerCount: answerCount,
+            authorityCount: authorityCount,
+            additionalDataCount: additionalDataCount
+        )
+    }
 }
