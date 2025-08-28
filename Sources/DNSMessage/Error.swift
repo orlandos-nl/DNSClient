@@ -46,6 +46,44 @@ public struct DNSMessageError: Error, Equatable, Hashable, Sendable {
     public static func nameTooLong(_ length: Int) -> DNSMessageError {
         Self.init(backing: .nameTooLong(length))
     }
+
+    /// An unrecognized label code was encountered during DNS name parsing.
+    /// - Parameter code: The unrecognized label code.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func unrecognizedLabelCode(_ code: UInt8) -> DNSMessageError {
+        Self.init(backing: .unrecognizedLabelCode(code))
+    }
+
+    /// Insufficient data available for decoding.
+    /// - Parameters:
+    ///   - expected: The number of bytes expected.
+    ///   - available: The number of bytes available.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func insufficientData(expected: Int, available: Int) -> DNSMessageError {
+        Self.init(backing: .insufficientData(expected: expected, available: available))
+    }
+
+    /// Invalid format encountered during decoding.
+    /// - Parameters:
+    ///   - field: The field that has invalid format.
+    ///   - reason: The reason why the format is invalid.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func invalidFormat(field: String, reason: String) -> DNSMessageError {
+        Self.init(backing: .invalidFormat(field: field, reason: reason))
+    }
+
+    /// Malformed record data.
+    /// - Parameters:
+    ///   - recordType: The type of record that is malformed.
+    ///   - reason: The reason why the record is malformed.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func malformedRecord(recordType: String, reason: String) -> DNSMessageError {
+        Self.init(backing: .malformedRecord(recordType: recordType, reason: reason))
+    }
 }
 
 extension DNSMessageError {
@@ -55,5 +93,9 @@ extension DNSMessageError {
         case labelTooLong(Int)
         case invalidLabelFormat(String)
         case nameTooLong(Int)
+        case unrecognizedLabelCode(UInt8)
+        case insufficientData(expected: Int, available: Int)
+        case invalidFormat(field: String, reason: String)
+        case malformedRecord(recordType: String, reason: String)
     }
 }

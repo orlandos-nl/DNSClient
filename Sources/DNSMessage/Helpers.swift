@@ -32,55 +32,6 @@ extension ByteBuffer {
         )
     }
 
-    package mutating func readLabels() -> [DNSLabel]? {
-        var labels = [DNSLabel]()
-
-        while let length = readInteger(endianness: .big, as: UInt8.self) {
-            if length == 0 {
-                labels.append("")
-
-                return labels
-            } else if length >= 64 {
-                guard length & 0b11000000 == 0b11000000 else {
-                    return nil
-                }
-
-                moveReaderIndex(to: readerIndex - 1)
-
-                guard
-                    var offset = self.readInteger(endianness: .big, as: UInt16.self)
-                else {
-                    return nil
-                }
-
-                offset = offset & 0b00111111_11111111
-
-                guard offset >= 0, offset <= writerIndex else {
-                    return nil
-                }
-
-                let oldReaderIndex = self.readerIndex
-                self.moveReaderIndex(to: Int(offset))
-
-                guard let referencedLabels = readLabels() else {
-                    return nil
-                }
-
-                labels.append(contentsOf: referencedLabels)
-                self.moveReaderIndex(to: oldReaderIndex)
-                return labels
-            } else {
-                guard let bytes = readBytes(length: Int(length)) else {
-                    return nil
-                }
-
-                labels.append(DNSLabel(bytes: bytes))
-            }
-        }
-
-        return labels
-    }
-
     package mutating func readQuestion() -> QuestionSection? {
         guard let labels = readLabels() else {
             return nil

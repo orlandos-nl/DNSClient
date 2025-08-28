@@ -113,3 +113,15 @@ extension DNSName: Collection {
         DNSName(uncheckedLabels: Array(labels[bounds]))
     }
 }
+
+public struct DNSNameEncoding: Equatable, Comparable, Hashable, Sendable {
+    public internal(set) var rawValue: UInt8
+
+    public static var compressed: Self { .init(rawValue: 0) }
+    public static var uncompressed: Self { .init(rawValue: 1) }
+    public static var uncompressedLowercase: Self { .init(rawValue: 2) }
+
+    public static func < (lhs: DNSNameEncoding, rhs: DNSNameEncoding) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
