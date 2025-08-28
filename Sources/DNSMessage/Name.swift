@@ -9,20 +9,22 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
     }
 
     /// Total length in bytes including labels, separators, and terminating dot.
-    public var length: Int {
+    public var characterCount: Int {
         self.labels.reduce(0, { $0 + $1.bytes.count }) + self.labels.count + 1
     }
 
     /// Number of labels that make up this name
-    public var count: Int {
+    public var labelCount: Int {
         labels.count
     }
 
+    /// Creates a DNS name from a dot-separated string (e.g., "example.com").
+    /// Each component between dots becomes a DNS label with proper validation.
     public init(from: String) throws {
         self.labels = Array(try from.lazy.split(separator: ".").map({ try DNSLabel(String($0)) }))
 
-        guard self.length <= 255 else {
-            throw DNSMessageError.nameTooLong(self.length)
+        guard self.characterCount <= 255 else {
+            throw DNSMessageError.nameTooLong(self.characterCount)
         }
     }
 
@@ -30,8 +32,8 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
     public init(labels: [DNSLabel]) throws {
         self.labels = labels
 
-        guard self.length <= 255 else {
-            throw DNSMessageError.nameTooLong(self.length)
+        guard self.characterCount <= 255 else {
+            throw DNSMessageError.nameTooLong(self.characterCount)
         }
     }
 
@@ -47,7 +49,7 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
 
     /// Insert a DNS label at any point inside this name
     public mutating func insert(label: DNSLabel, at index: Index) throws {
-        let newLength = self.length + Int(label.bytes.count) + 1
+        let newLength = self.characterCount + Int(label.bytes.count) + 1
         guard newLength <= 255 else {
             throw DNSMessageError.nameTooLong(newLength)
         }
@@ -62,7 +64,7 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
 
     /// Appends another DNS name to this name.
     public mutating func append(contentsOf other: DNSName) throws {
-        let newLength = self.length + other.length
+        let newLength = self.characterCount + other.characterCount
         guard newLength <= 255 else {
             throw DNSMessageError.nameTooLong(newLength)
         }

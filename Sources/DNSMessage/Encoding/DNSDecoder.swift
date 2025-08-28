@@ -7,18 +7,17 @@ public struct DNSDecoder {
         self.buffer = buffer
     }
 
-    public mutating func readDNSName() throws -> DNSName {
-        var name = DNSName()
+    public mutating func readDNSName(name: inout DNSName) throws {
         while let length = buffer.readInteger(as: UInt8.self) {
             switch length {
             case 0:
-                return name
+                return
             case 1..<64:
                 guard let bytes = buffer.readBytes(length: Int(length)) else {
                     throw DNSMessageError.insufficientData(expected: Int(length), available: buffer.readableBytes)
                 }
 
-                try name.append(label: try DNSLabel(bytes: bytes))
+                try name.append(label: DNSLabel(bytes: bytes))
             case 64... where length & 0xC0 == 0xC0:
                 buffer.moveReaderIndex(to: buffer.readerIndex - 1)
 
@@ -37,12 +36,9 @@ public struct DNSDecoder {
 
                 let currentReaderIndex = buffer.readerIndex
                 buffer.moveReaderIndex(to: Int(pointer))
-
-                let referencedName = try self.readDNSName()
+                try self.readDNSName(name: &name)
                 buffer.moveReaderIndex(to: currentReaderIndex)
-
-                try name.append(contentsOf: referencedName)
-                return name
+                return
             default:
                 throw DNSMessageError.unrecognizedLabelCode(length)
             }

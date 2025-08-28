@@ -25,12 +25,14 @@ public struct DNSLabel: Sendable, CustomStringConvertible, Hashable {
         try self.init(label)
     }
 
+    /// Returns a new DNS label with all characters converted to lowercase.
+    /// DNS names are case-insensitive, so this is often used for comparison.
     public func toLowercase() -> DNSLabel {
         try! DNSLabel(self.label.lowercased())
     }
 
     private static func validateLabel(_ label: String) throws {
-        guard label.validLabel else {
+        guard label.isValidLabel else {
             if label.isEmpty {
                 throw DNSMessageError.emptyLabel()
             } else if label.count >= 64 {
@@ -51,7 +53,7 @@ extension DNSLabel: Equatable {
 }
 
 extension String {
-    var validLabel: Bool {
+    var isValidLabel: Bool {
         guard self.allSatisfy({ $0.isASCII }) else { return false }
         guard !self.isEmpty && self.count < 64 else { return false }
 
