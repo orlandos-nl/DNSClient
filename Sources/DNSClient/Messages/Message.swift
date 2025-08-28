@@ -1,14 +1,14 @@
-import NIO
 import Foundation
+import NIO
 
 /// The header of a DNS message.
 public struct DNSMessageHeader {
     /// The ID of the message. This is used to match responses to requests.
     public internal(set) var id: UInt16
-    
+
     /// The flags of the message.
     public let options: MessageOptions
-    
+
     /// The number of questions in the message.
     public let questionCount: UInt16
 
@@ -42,19 +42,19 @@ public struct DNSMessageHeader {
 public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
     /// The length of the label. This is the number of bytes in the label.
     public let length: UInt8
-    
+
     /// The bytes of the label. This is the actual label, not including the length byte. This is a maximum of 63 bytes and is not null terminated. This is the raw bytes of the label, not the UTF-8 representation.
     public let label: [UInt8]
-    
+
     /// Creates a new label from the given string.
     public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
     }
-    
+
     /// Creates a new label from the given bytes.
     public init(bytes: [UInt8]) {
         assert(bytes.count < 64)
-        
+
         self.label = bytes
         self.length = UInt8(bytes.count)
     }
@@ -93,7 +93,7 @@ public enum DNSResourceType: UInt16 {
 
     case null
 
-    /// A request for a well known service description. 
+    /// A request for a well known service description.
     case wks
 
     /// A domain name pointer (ie. in-addr.arpa) for address to name
@@ -116,7 +116,7 @@ public enum DNSResourceType: UInt16 {
 
     /// A request for an SRV record. This is used for service discovery.
     case srv = 33
-    
+
     // QuestionType exclusive
 
     /// A request for a transfer of an entire zone
@@ -134,7 +134,7 @@ public enum DNSResourceType: UInt16 {
 
 public typealias QuestionType = DNSResourceType
 
-/// The class of the resource record. This is used to determine the format of the record. 
+/// The class of the resource record. This is used to determine the format of the record.
 public enum DataClass: UInt16 {
     /// The Internet
     case internet = 1
@@ -159,7 +159,7 @@ public enum Record {
 
     /// An IPv4 address record. This is used for resolving hostnames to IP addresses.
     case a(ResourceRecord<ARecord>)
-    
+
     /// A text record. This is used for storing arbitrary text.
     case txt(ResourceRecord<TXTRecord>)
 
@@ -174,7 +174,7 @@ public enum Record {
 
     /// A domain name pointer (ie. in-addr.arpa)
     case ptr(ResourceRecord<PTRRecord>)
-    
+
     /// Any other record. This is used for records that are not yet supported through convenience methods.
     case other(ResourceRecord<ByteBuffer>)
 }
@@ -184,7 +184,7 @@ public struct TXTRecord: DNSResource {
     /// The values of the text record. This is a dictionary of key-value pairs.
     public let values: [String: String]
     public let rawValues: [String]
-    
+
     init(values: [String: String], rawValues: [String]) {
         self.values = values
         self.rawValues = rawValues
@@ -194,29 +194,29 @@ public struct TXTRecord: DNSResource {
         var currentIndex = 0
         var components: [String: String] = [:]
         var rawValues: [String] = []
-        
+
         while currentIndex < length {
             guard let componentLenght = buffer.readInteger(endianness: .big, as: UInt8.self) else {
                 return nil
             }
 
             currentIndex += (Int(componentLenght) + 1)
-            
+
             guard let componentString = buffer.readString(length: Int(componentLenght)) else {
                 return nil
             }
 
             rawValues.append(componentString)
-            
+
             let parts = componentString.split(separator: "=")
-            
+
             if parts.count != 2 {
                 continue
             }
-            
+
             components[String(parts[0])] = String(parts[1])
         }
-        
+
         return TXTRecord(values: components, rawValues: rawValues)
     }
 
@@ -277,7 +277,7 @@ public struct ARecord: DNSResource {
 
     /// The address of the record as a string.
     public var stringAddress: String {
-        return withUnsafeBytes(of: address) { buffer in
+        withUnsafeBytes(of: address) { buffer in
             let buffer = buffer.bindMemory(to: UInt8.self)
             return "\(buffer[3]).\(buffer[2]).\(buffer[1]).\(buffer[0])"
         }
@@ -300,11 +300,24 @@ public struct AAAARecord: DNSResource {
 
     /// The address of the record as a string.
     public var stringAddress: String {
-        String(format: "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-               address[0], address[1], address[2], address[3],
-               address[4], address[5], address[6], address[7],
-               address[8], address[9], address[10], address[11],
-               address[12], address[13], address[14], address[15]
+        String(
+            format: "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+            address[0],
+            address[1],
+            address[2],
+            address[3],
+            address[4],
+            address[5],
+            address[6],
+            address[7],
+            address[8],
+            address[9],
+            address[10],
+            address[11],
+            address[12],
+            address[13],
+            address[14],
+            address[15]
         )
     }
 
@@ -331,7 +344,7 @@ public struct ResourceRecord<Resource: DNSResource>: Sendable {
 
     /// The time to live of the record. This is the amount of time the record should be cached for.
     public let ttl: UInt32
-    
+
     /// The resource of the record. This is the data of the record.
     public var resource: Resource
 
@@ -359,7 +372,7 @@ public protocol DNSResource: Sendable {
 /// An extension to `ByteBuffer` that adds a method for reading a DNS resource.
 extension ByteBuffer: DNSResource {
     public static func read(from buffer: inout ByteBuffer, length: Int) -> ByteBuffer? {
-        return buffer.readSlice(length: length)
+        buffer.readSlice(length: length)
     }
 
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
@@ -367,14 +380,14 @@ extension ByteBuffer: DNSResource {
     }
 }
 
-fileprivate struct InvalidSOARecord: Error {}
+private struct InvalidSOARecord: Error {}
 
 /// An extension to `ResourceRecord` that adds a method for parsing a SOA record.
 extension ResourceRecord where Resource == ByteBuffer {
     mutating func parseSOA() throws -> ZoneAuthority {
         guard
             let domainName = resource.readLabels(),
-            resource.readableBytes >= 20, // Minimum 5 UInt32's
+            resource.readableBytes >= 20,  // Minimum 5 UInt32's
             let serial: UInt32 = resource.readInteger(endianness: .big),
             let refresh: UInt32 = resource.readInteger(endianness: .big),
             let retry: UInt32 = resource.readInteger(endianness: .big),
@@ -383,7 +396,7 @@ extension ResourceRecord where Resource == ByteBuffer {
         else {
             throw InvalidSOARecord()
         }
-        
+
         return ZoneAuthority(
             domainName: domainName,
             adminMail: "",
@@ -401,7 +414,7 @@ extension UInt32 {
     func socketAddress(port: Int) throws -> SocketAddress {
         let text = inet_ntoa(in_addr(s_addr: self.bigEndian))!
         let host = String(cString: text)
-        
+
         return try SocketAddress(ipAddress: host, port: port)
     }
 }
@@ -419,11 +432,11 @@ struct ZoneAuthority {
 extension Sequence where Element == DNSLabel {
     /// Converts a sequence of DNS labels to a string.
     public var string: String {
-        return self.compactMap { label in
+        self.compactMap { label in
             if let string = String(bytes: label.label, encoding: .utf8), string.count > 0 {
                 return string
             }
-            
+
             return nil
         }.joined(separator: ".")
     }
@@ -454,7 +467,7 @@ extension ByteBuffer {
         written += writeInteger(UInt8(0))
         return written
     }
-    
+
     /// write labels into DNS packet
     @discardableResult
     mutating func writeLabels(_ labels: [DNSLabel]) -> Int {
@@ -463,12 +476,12 @@ extension ByteBuffer {
             written += writeInteger(UInt8(label.label.count))
             written += writeBytes(label.label)
         }
-        
+
         return written
     }
-    
+
     func labelsSize(_ labels: [DNSLabel]) -> Int {
-        return labels.reduce(0, { $0 + 2 + $1.label.count })
+        labels.reduce(0, { $0 + 2 + $1.label.count })
     }
 }
 

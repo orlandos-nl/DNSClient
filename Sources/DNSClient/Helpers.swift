@@ -18,8 +18,8 @@ extension ByteBuffer {
             let answerCount = readInteger(endianness: .big, as: UInt16.self),
             let authorityCount = readInteger(endianness: .big, as: UInt16.self),
             let additionalRecordCount = readInteger(endianness: .big, as: UInt16.self)
-            else {
-                return nil
+        else {
+            return nil
         }
 
         return DNSMessageHeader(
@@ -91,8 +91,8 @@ extension ByteBuffer {
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
             let type = QuestionType(rawValue: typeNumber),
             let dataClass = DataClass(rawValue: classNumber)
-            else {
-                return nil
+        else {
+            return nil
         }
 
         return QuestionSection(labels: labels, type: type, questionClass: dataClass)
@@ -143,16 +143,16 @@ extension ByteBuffer {
             let classNumber = readInteger(endianness: .big, as: UInt16.self),
             let ttl = readInteger(endianness: .big, as: UInt32.self),
             let dataLength = readInteger(endianness: .big, as: UInt16.self)
-            else {
-                return nil
+        else {
+            return nil
         }
-        
+
         let newIndex = readerIndex + Int(dataLength)
-        
+
         guard newIndex <= writerIndex else {
             return nil
         }
-        
+
         defer {
             moveReaderIndex(to: newIndex)
         }
@@ -219,14 +219,14 @@ extension ByteBuffer {
             }
 
             return .ptr(ptr)
-            default:
+        default:
             break
         }
 
         guard let other = make(ByteBuffer.self) else {
             return nil
         }
-        
+
         return .other(other)
     }
 
@@ -238,8 +238,8 @@ extension ByteBuffer {
             let ttl = readInteger(endianness: .big, as: UInt32.self),
             let dataLength = readInteger(endianness: .big, as: UInt16.self),
             let resource = ByteBuffer.read(from: &self, length: Int(dataLength))
-            else {
-                return nil
+        else {
+            return nil
         }
 
         let record = ResourceRecord(

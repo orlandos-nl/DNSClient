@@ -13,19 +13,19 @@ public final class DNSClient: Resolver, Sendable {
         get { isMulticastBox.withLockedValue { $0 } }
         set { isMulticastBox.withLockedValue { $0 = newValue } }
     }
-    
+
     var loop: EventLoop {
-        return channel.eventLoop
+        channel.eventLoop
     }
     // Each query has an ID to keep track of which response belongs to which query
     let messageID: NIOLockedValueBox<UInt16> = NIOLockedValueBox(0)
-    
+
     internal init(channel: Channel, address: SocketAddress, decoder: DNSDecoder) {
         self.channel = channel
         self.primaryAddress = address
         self.dnsDecoder = decoder
     }
-    
+
     /// Create a new `DNSClient` that will send queries to the specified address using your own `Channel`.
     public init(channel: Channel, dnsServerAddress: SocketAddress, context: DNSClientContext) {
         self.channel = channel
@@ -41,7 +41,7 @@ public final class DNSClient: Resolver, Sendable {
 /// A context that can be used to create a `DNSClient`. This can be used to create only one `DNSClient`, but is useful if you want to use your own `Channel`.
 public struct DNSClientContext {
     internal let decoder: DNSDecoder
-    
+
     /// Create a new `DNSClientContext`. This is used to create a `DNSClient` on a custom `Channel`.
     public init(eventLoopGroup: EventLoopGroup) {
         self.decoder = DNSDecoder(group: eventLoopGroup)

@@ -20,11 +20,11 @@ try await channel.executeThenClose {
     for try await envelope in inbound {
         do {
             let inbound = try DNSDecoder.parse(envelope.data)
-            
+
             guard let question = inbound.questions.first else {
                 continue
             }
-            
+
             let message = Message(
                 header: DNSMessageHeader(
                     id: inbound.header.id,
@@ -42,7 +42,7 @@ try await channel.executeThenClose {
                             dataType: question.type.rawValue,
                             dataClass: question.questionClass.rawValue,
                             ttl: 100,
-                            resource: ARecord(address: 12312312)
+                            resource: ARecord(address: 12_312_312)
                         )
                     )
                 ],

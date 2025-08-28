@@ -40,21 +40,22 @@ extension DNSClient {
     /// - Returns: A future with the resource record containing a domain name associated with the IPv4 Address.
     public func ipv4InverseAddress(_ address: String) -> EventLoopFuture<[ResourceRecord<PTRRecord>]> {
         // A.B.C.D -> D.C.B.A.IN-ADDR.ARPA.
-        let inAddrArpaDomain = address
+        let inAddrArpaDomain =
+            address
             .split(separator: ".")
             .map(String.init)
             .reversed()
             .joined(separator: ".")
             .appending(".in-addr.arpa.")
-        
+
         return self.sendQuery(forHost: inAddrArpaDomain, type: .ptr).map { message in
-            return message.answers.compactMap { answer in
+            message.answers.compactMap { answer in
                 guard case .ptr(let record) = answer else { return nil }
                 return record
             }
         }
     }
-    
+
     /// Request IPv6 inverse address (PTR records) from nameserver
     ///
     ///  Inverse addressing queries use DNS PTR Records.
@@ -66,88 +67,91 @@ extension DNSClient {
     /// - Throws: IOError(errnoCode: EINVAL, reason: #function) , IOError(errnoCode: errno, reason: #function)
     public func ipv6InverseAddress(_ address: String) throws -> EventLoopFuture<[ResourceRecord<PTRRecord>]> {
         var ipv6Addr = in6_addr()
-        
+
         let retval = withUnsafeMutablePointer(to: &ipv6Addr) {
             inet_pton(AF_INET6, address, UnsafeMutablePointer($0))
         }
-        
+
         if retval == 0 {
             throw IOError(errnoCode: EINVAL, reason: #function)
         } else if retval == -1 {
             throw IOError(errnoCode: errno, reason: #function)
         }
-        
+
         #if canImport(Glibc)
-        let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                      ipv6Addr.__in6_u.__u6_addr8.0,
-                      ipv6Addr.__in6_u.__u6_addr8.1,
-                      ipv6Addr.__in6_u.__u6_addr8.2,
-                      ipv6Addr.__in6_u.__u6_addr8.3,
-                      ipv6Addr.__in6_u.__u6_addr8.4,
-                      ipv6Addr.__in6_u.__u6_addr8.5,
-                      ipv6Addr.__in6_u.__u6_addr8.6,
-                      ipv6Addr.__in6_u.__u6_addr8.7,
-                      ipv6Addr.__in6_u.__u6_addr8.8,
-                      ipv6Addr.__in6_u.__u6_addr8.9,
-                      ipv6Addr.__in6_u.__u6_addr8.10,
-                      ipv6Addr.__in6_u.__u6_addr8.11,
-                      ipv6Addr.__in6_u.__u6_addr8.12,
-                      ipv6Addr.__in6_u.__u6_addr8.13,
-                      ipv6Addr.__in6_u.__u6_addr8.14,
-                      ipv6Addr.__in6_u.__u6_addr8.15
+        let inAddrArpaDomain = String(
+            format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            ipv6Addr.__in6_u.__u6_addr8.0,
+            ipv6Addr.__in6_u.__u6_addr8.1,
+            ipv6Addr.__in6_u.__u6_addr8.2,
+            ipv6Addr.__in6_u.__u6_addr8.3,
+            ipv6Addr.__in6_u.__u6_addr8.4,
+            ipv6Addr.__in6_u.__u6_addr8.5,
+            ipv6Addr.__in6_u.__u6_addr8.6,
+            ipv6Addr.__in6_u.__u6_addr8.7,
+            ipv6Addr.__in6_u.__u6_addr8.8,
+            ipv6Addr.__in6_u.__u6_addr8.9,
+            ipv6Addr.__in6_u.__u6_addr8.10,
+            ipv6Addr.__in6_u.__u6_addr8.11,
+            ipv6Addr.__in6_u.__u6_addr8.12,
+            ipv6Addr.__in6_u.__u6_addr8.13,
+            ipv6Addr.__in6_u.__u6_addr8.14,
+            ipv6Addr.__in6_u.__u6_addr8.15
         ).reversed()
-         .map { "\($0)" }
-         .joined(separator: ".")
-         .appending(".ip6.arpa.")
-        
+            .map { "\($0)" }
+            .joined(separator: ".")
+            .appending(".ip6.arpa.")
+
         #elseif canImport(Musl)
-        let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                      ipv6Addr.__in6_union.__s6_addr.0,
-                      ipv6Addr.__in6_union.__s6_addr.1,
-                      ipv6Addr.__in6_union.__s6_addr.2,
-                      ipv6Addr.__in6_union.__s6_addr.3,
-                      ipv6Addr.__in6_union.__s6_addr.4,
-                      ipv6Addr.__in6_union.__s6_addr.5,
-                      ipv6Addr.__in6_union.__s6_addr.6,
-                      ipv6Addr.__in6_union.__s6_addr.7,
-                      ipv6Addr.__in6_union.__s6_addr.8,
-                      ipv6Addr.__in6_union.__s6_addr.9,
-                      ipv6Addr.__in6_union.__s6_addr.10,
-                      ipv6Addr.__in6_union.__s6_addr.11,
-                      ipv6Addr.__in6_union.__s6_addr.12,
-                      ipv6Addr.__in6_union.__s6_addr.13,
-                      ipv6Addr.__in6_union.__s6_addr.14,
-                      ipv6Addr.__in6_union.__s6_addr.15
+        let inAddrArpaDomain = String(
+            format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            ipv6Addr.__in6_union.__s6_addr.0,
+            ipv6Addr.__in6_union.__s6_addr.1,
+            ipv6Addr.__in6_union.__s6_addr.2,
+            ipv6Addr.__in6_union.__s6_addr.3,
+            ipv6Addr.__in6_union.__s6_addr.4,
+            ipv6Addr.__in6_union.__s6_addr.5,
+            ipv6Addr.__in6_union.__s6_addr.6,
+            ipv6Addr.__in6_union.__s6_addr.7,
+            ipv6Addr.__in6_union.__s6_addr.8,
+            ipv6Addr.__in6_union.__s6_addr.9,
+            ipv6Addr.__in6_union.__s6_addr.10,
+            ipv6Addr.__in6_union.__s6_addr.11,
+            ipv6Addr.__in6_union.__s6_addr.12,
+            ipv6Addr.__in6_union.__s6_addr.13,
+            ipv6Addr.__in6_union.__s6_addr.14,
+            ipv6Addr.__in6_union.__s6_addr.15
         ).reversed()
-         .map { "\($0)" }
-         .joined(separator: ".")
-         .appending(".ip6.arpa.")
+            .map { "\($0)" }
+            .joined(separator: ".")
+            .appending(".ip6.arpa.")
         #else
-        let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                      ipv6Addr.__u6_addr.__u6_addr8.0,
-                      ipv6Addr.__u6_addr.__u6_addr8.1,
-                      ipv6Addr.__u6_addr.__u6_addr8.2,
-                      ipv6Addr.__u6_addr.__u6_addr8.3,
-                      ipv6Addr.__u6_addr.__u6_addr8.4,
-                      ipv6Addr.__u6_addr.__u6_addr8.5,
-                      ipv6Addr.__u6_addr.__u6_addr8.6,
-                      ipv6Addr.__u6_addr.__u6_addr8.7,
-                      ipv6Addr.__u6_addr.__u6_addr8.8,
-                      ipv6Addr.__u6_addr.__u6_addr8.9,
-                      ipv6Addr.__u6_addr.__u6_addr8.10,
-                      ipv6Addr.__u6_addr.__u6_addr8.11,
-                      ipv6Addr.__u6_addr.__u6_addr8.12,
-                      ipv6Addr.__u6_addr.__u6_addr8.13,
-                      ipv6Addr.__u6_addr.__u6_addr8.14,
-                      ipv6Addr.__u6_addr.__u6_addr8.15
+        let inAddrArpaDomain = String(
+            format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            ipv6Addr.__u6_addr.__u6_addr8.0,
+            ipv6Addr.__u6_addr.__u6_addr8.1,
+            ipv6Addr.__u6_addr.__u6_addr8.2,
+            ipv6Addr.__u6_addr.__u6_addr8.3,
+            ipv6Addr.__u6_addr.__u6_addr8.4,
+            ipv6Addr.__u6_addr.__u6_addr8.5,
+            ipv6Addr.__u6_addr.__u6_addr8.6,
+            ipv6Addr.__u6_addr.__u6_addr8.7,
+            ipv6Addr.__u6_addr.__u6_addr8.8,
+            ipv6Addr.__u6_addr.__u6_addr8.9,
+            ipv6Addr.__u6_addr.__u6_addr8.10,
+            ipv6Addr.__u6_addr.__u6_addr8.11,
+            ipv6Addr.__u6_addr.__u6_addr8.12,
+            ipv6Addr.__u6_addr.__u6_addr8.13,
+            ipv6Addr.__u6_addr.__u6_addr8.14,
+            ipv6Addr.__u6_addr.__u6_addr8.15
         ).reversed()
-         .map { "\($0)" }
-         .joined(separator: ".")
-         .appending(".ip6.arpa.")
+            .map { "\($0)" }
+            .joined(separator: ".")
+            .appending(".ip6.arpa.")
         #endif
-        
+
         return self.sendQuery(forHost: inAddrArpaDomain, type: .ptr).map { message in
-            return message.answers.compactMap { answer in
+            message.answers.compactMap { answer in
                 guard case .ptr(let record) = answer else { return nil }
                 return record
             }
