@@ -1,80 +1,66 @@
 import Foundation
 import NIOCore
 
-/// A label in a DNS message. This is a single part of a domain name. For example, `google` is a label in `google.com`. Labels are limited to 63 bytes and are not null terminated.
-public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
-    /// The length of the label. This is the number of bytes in the label.
-    public let length: UInt8
+/// A DNS label representing a single component of a domain name (e.g., 'google' in 'google.com').
+/// Labels must be ASCII-encoded, non-empty, and at most 63 bytes long.
+public struct DNSLabel: Sendable, CustomStringConvertible, Hashable {
+    public internal(set) var bytes: [UInt8]
+    private let label: String
 
-    /// The bytes of the label. This is the actual label, not including the length byte. This is a maximum of 63 bytes and is not null terminated. This is the raw bytes of the label, not the UTF-8 representation.
-    public let label: [UInt8]
+    public var description: String {
+        self.label
+    }
 
-    /// Creates a new label from the given string.
-    public init(stringLiteral string: String) {
-        self.init(bytes: Array(string.utf8))
+    /// Creates a new label from a given String.
+    /// String must only contain ASCII encoded characters and must not exceed 63 characters.
+    public init(_ label: String) throws {
+        try Self.validateLabel(label)
+        self.bytes = Array(label.utf8)
+        self.label = label
     }
 
     /// Creates a new label from the given bytes.
-    public init(bytes: [UInt8]) {
-        assert(bytes.count < 64)
-
-        self.label = bytes
-        self.length = UInt8(bytes.count)
+    public init(bytes: [UInt8]) throws {
+        let label = String(decoding: bytes, as: UTF8.self)
+        try self.init(label)
     }
-}
 
-extension Sequence where Element == DNSLabel {
-    /// Converts a sequence of DNS labels to a string.
-    public var string: String {
-        self.compactMap { label in
-            if let string = String(bytes: label.label, encoding: .utf8), string.count > 0 {
-                return string
-            }
-
-            return nil
-        }.joined(separator: ".")
+    public func toLowercase() -> DNSLabel {
+        try! DNSLabel(self.label.lowercased())
     }
-}
 
-extension ByteBuffer {
-    /// Either write label index or list of labelsf
-    @discardableResult
-    public mutating func writeCompressedLabels(_ labels: [DNSLabel], labelIndices: inout [String: UInt16]) -> Int {
-        var written = 0
-        var labels = labels
-        while !labels.isEmpty {
-            let label = labels.removeFirst()
-            // use combined labels as a key for a position in the packet
-            let key = labels.string
-            // if position exists output position or'ed with 0xc000 and return
-            if let labelIndex = labelIndices[key] {
-                written += writeInteger(labelIndex | 0xc000)
-                return written
+    private static func validateLabel(_ label: String) throws {
+        guard label.validLabel else {
+            if label.isEmpty {
+                throw DNSMessageError.emptyLabel()
+            } else if label.count >= 64 {
+                throw DNSMessageError.labelTooLong(label.count)
+            } else if !label.allSatisfy({ $0.isASCII }) {
+                throw DNSMessageError.labelNotAsciiEncoded(label)
             } else {
-                // if no position exists for this combination of labels output the first label
-                labelIndices[key] = numericCast(writerIndex)
-                written += writeInteger(UInt8(label.label.count))
-                written += writeBytes(label.label)
+                throw DNSMessageError.invalidLabelFormat(label)
             }
         }
-        // write end of labels
-        written += writeInteger(UInt8(0))
-        return written
     }
+}
 
-    /// write labels into DNS packet
-    @discardableResult
-    public mutating func writeLabels(_ labels: [DNSLabel]) -> Int {
-        var written = 0
-        for label in labels {
-            written += writeInteger(UInt8(label.label.count))
-            written += writeBytes(label.label)
-        }
-
-        return written
+extension DNSLabel: Equatable {
+    public static func == (lhs: DNSLabel, rhs: DNSLabel) -> Bool {
+        lhs.toLowercase().bytes == rhs.toLowercase().bytes
     }
+}
 
-    func labelsSize(_ labels: [DNSLabel]) -> Int {
-        labels.reduce(0, { $0 + 2 + $1.label.count })
+extension String {
+    var validLabel: Bool {
+        guard self.allSatisfy({ $0.isASCII }) else { return false }
+        guard !self.isEmpty && self.count < 64 else { return false }
+
+        let firstChar = self.first!
+        guard firstChar.isLetter || firstChar.isNumber || firstChar == "_" else { return false }
+
+        guard self.count == 1 || self.last!.isLetter || self.last!.isNumber else { return false }
+
+        let middleChars = self.dropFirst().dropLast()
+        return middleChars.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" })
     }
 }
