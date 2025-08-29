@@ -9,20 +9,31 @@ public struct DNSHeaderFlags: Sendable, OptionSet {
         self.rawValue = rawValue
     }
 
+    /// Query/Response bit - indicates whether this is a query (0) or response (1)
     public static let response = DNSHeaderFlags(rawValue: 1 << 15)  // QR
 
     // Opcode is stored in bits 11-14, handled separately during encoding/decoding
     private static let opcodeMask: UInt16 = 0b0111_1000_0000_0000
     private static let opcodeShift: Int = 11
 
+    /// Authoritative Answer - set by name servers to indicate authority for the domain
     public static let authoritativeAnswer = DNSHeaderFlags(rawValue: 1 << 10)  // AA
+    
+    /// Truncation - indicates message was truncated due to length (suggests retry with TCP)
     public static let truncation = DNSHeaderFlags(rawValue: 1 << 9)  // TC
+    
+    /// Recursion Desired - directs name server to pursue query recursively
     public static let recursionDesired = DNSHeaderFlags(rawValue: 1 << 8)  // RD
+    
+    /// Recursion Available - indicates recursive query support is available
     public static let recursionAvailable = DNSHeaderFlags(rawValue: 1 << 7)  // RA
 
-    // Skipping Z
+    // Skipping Z (reserved bit, must be zero per RFC)
 
+    /// Authentic Data - indicates resolver believes response data is authentic (DNSSEC)
     public static let authenticData = DNSHeaderFlags(rawValue: 1 << 5)  // AD
+    
+    /// Checking Disabled - indicates resolver should not perform DNSSEC validation
     public static let checkingDisabled = DNSHeaderFlags(rawValue: 1 << 4)  // CD
 
     // Skipping RCODE (Return Code) as EDNS(0) has expanded it to 12 bits.

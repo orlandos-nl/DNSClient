@@ -1,6 +1,7 @@
 import Foundation
 import NIOCore
 
+/// Represents a DNS domain name as a sequence of labels (e.g., "example.com" → ["example", "com"]).
 public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
     public internal(set) var labels: [DNSLabel]
 
@@ -116,11 +117,26 @@ extension DNSName: Collection {
     }
 }
 
+/// Specifies how DNS names should be encoded in wire format.
+///
+/// The encoding strategy determines both compression behavior and case handling, which evolved
+/// through multiple RFCs:
+///
+/// - RFC 1035: Introduced name compression for efficiency
+/// - RFC 3597: Restricted compression for new record types
+/// - RFC 3597 Section 7: Mandated lowercase conversion for DNSSEC canonical form
 public struct DNSNameEncoding: Equatable, Comparable, Hashable, Sendable {
     public internal(set) var rawValue: UInt8
 
+    /// Uses DNS compression with automatic lowercasing for DNSSEC canonical form.
+    /// According to RFC 3597 Section 7, names are converted to lowercase when compressed to ensure
+    /// DNSSEC signature correctness when case distinctions are lost due to compression.
     public static var compressed: Self { .init(rawValue: 0) }
+
+    /// No compression, preserves original case of domain names.
     public static var uncompressed: Self { .init(rawValue: 1) }
+
+    /// No compression, with explicit conversion to lowercase for canonical form.
     public static var uncompressedLowercase: Self { .init(rawValue: 2) }
 
     public static func < (lhs: DNSNameEncoding, rhs: DNSNameEncoding) -> Bool {
