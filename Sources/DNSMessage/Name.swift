@@ -50,9 +50,9 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
 
     /// Insert a DNS label at any point inside this name
     public mutating func insert(label: DNSLabel, at index: Index) throws {
-        let newLength = self.characterCount + Int(label.bytes.count) + 1
-        guard newLength <= 255 else {
-            throw DNSMessageError.nameTooLong(newLength)
+        let newCount = self.characterCount + Int(label.bytes.count) + 1
+        guard newCount <= 255 else {
+            throw DNSMessageError.nameTooLong(newCount)
         }
 
         labels.insert(label, at: index)
@@ -65,9 +65,9 @@ public struct DNSName: CustomStringConvertible, Hashable, Sendable, Equatable {
 
     /// Appends another DNS name to this name.
     public mutating func append(contentsOf other: DNSName) throws {
-        let newLength = self.characterCount + other.characterCount
-        guard newLength <= 255 else {
-            throw DNSMessageError.nameTooLong(newLength)
+        let newCount = self.characterCount + other.characterCount
+        guard newCount <= 255 else {
+            throw DNSMessageError.nameTooLong(newCount)
         }
 
         self.labels.append(contentsOf: other.labels)
