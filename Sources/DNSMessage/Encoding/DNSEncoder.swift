@@ -84,6 +84,11 @@ public struct DNSEncoder {
                 }
             }
         case .compressed:
+            // RFC 3597 Section 7: DNSSEC canonical form requires downcasing of embedded domain names
+            // for RR types published before RFC 3597 (NS, MD, MF, CNAME, SOA, MB, MG, MR, PTR,
+            // HINFO, MINFO, MX, RP, AFSDB, RT, SIG, PX, NXT, NAPTR, KX, SRV, DNAME, A6).
+            // This ensures correctness of DNSSEC signatures when case distinctions are lost due to compression.
+            name.toLowercase()
             for i in 0..<name.count {
                 let currName = name[i...]
 
