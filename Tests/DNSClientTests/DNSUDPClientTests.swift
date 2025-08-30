@@ -115,7 +115,7 @@ final class DNSUDPClientTests: XCTestCase {
 
     func testSOAQuery() throws {
         try testClient { dnsClient in
-            let results = try dnsClient.initiateSOAQuery(forHost: "example.com").wait()
+            let results = try dnsClient.initiateSOAQuery(forDomain: "example.com").wait()
             XCTAssertEqual(results.count, 1)
             XCTAssertEqual(results.first?.resource.mname.string, "ns.icann.org")
         }

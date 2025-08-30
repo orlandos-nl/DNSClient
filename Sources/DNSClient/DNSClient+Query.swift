@@ -207,8 +207,8 @@ extension DNSClient {
     /// - parameters:
     ///     - host: Hostname to get the records from
     /// - returns: A future with an array of resource records
-    public func initiateSOAQuery(forHost host: String) -> EventLoopFuture<[ResourceRecord<SOARecord>]> {
-        return self.sendQuery(forHost: host, type: .soa).map { message in
+    public func initiateSOAQuery(forDomain domain: String) -> EventLoopFuture<[ResourceRecord<SOARecord>]> {
+        return self.sendQuery(forHost: domain, type: .soa).map { message in
             return message.answers.compactMap { answer in
                 guard case .soa(let record) = answer else { return nil }
 
