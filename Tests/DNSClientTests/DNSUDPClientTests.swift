@@ -103,6 +103,23 @@ final class DNSUDPClientTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
         }
     }
+
+    func testNSQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateNSQuery(forDomain: "example.com").wait()
+            XCTAssertEqual(results.count, 2)
+            let names = results.map { $0.resource.labels.string }.sorted()
+            XCTAssertEqual(names, ["a.iana-servers.net", "b.iana-servers.net"])
+        }
+    }
+
+    func testSOAQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateSOAQuery(forHost: "example.com").wait()
+            XCTAssertEqual(results.count, 1)
+            XCTAssertEqual(results.first?.resource.mname.string, "ns.icann.org")
+        }
+    }
     
     func testSRVRecordsAsyncRequest() throws {
         testClient { dnsClient in
@@ -168,15 +185,24 @@ final class DNSUDPClientTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
     }
     
-    func testipv6InverseAddressInvalidInput() throws {
-        XCTAssertThrowsError(try dnsClient.ipv6InverseAddress(":::0").wait()) { error in
-            
-            #if os(Linux)
-            XCTAssertEqual(error.localizedDescription , "The operation could not be completed. (NIOCore.IOError error 1.)")
-            #else
-            XCTAssertEqual(error.localizedDescription , "The operation couldn’t be completed. (NIOCore.IOError error 1.)")
-            #endif
+    // Testing inet_pton failure
+    func testIPv6InverseAddressInvalidInputReturnsFailedFuture() throws {
+        let expectation = self.expectation(description: "Getting a PTR record for an invalid IPv6 address should fail")
+        
+        let futureResult = dnsClient.ipv6InverseAddress("this-is-not-a-valid-ip")
+        
+        futureResult.whenFailure { error in
+            // Optionally assert that the error is the specific type you expect.
+            XCTAssert(error is IOError, "The error should be an IOError")
+            // Fulfill the expectation to signal that the test completed successfully.
+            expectation.fulfill()
         }
+        
+        futureResult.whenSuccess { _ in
+            XCTFail("ipv6InverseAddress should have failed for an invalid IP, but it succeeded.")
+        }
+        
+        waitForExpectations(timeout: 2)
     }
     
     func testPTRRecordDescription() throws {
