@@ -153,7 +153,7 @@ extension DNSClient {
             struct DNSTimeoutError: Error {}
             
             // Schedule a timeout that also removes the in-flight cache entry to avoid leaks
-            let timeoutTask = self.loop.scheduleTask(in: timeout) { [messageCache = dnsDecoder.messageCache] in
+            let timeoutTask = self.loop.scheduleTask(in: timeout) { [messageCache = self.dnsDecoder.messageCache] in
                 messageCache.withLockedValue { cache in
                     cache[message.header.id] = nil
                 }

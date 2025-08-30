@@ -185,24 +185,15 @@ final class DNSUDPClientTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
     }
     
-    // Testing inet_pton failure
-    func testIPv6InverseAddressInvalidInputReturnsFailedFuture() throws {
-        let expectation = self.expectation(description: "Getting a PTR record for an invalid IPv6 address should fail")
-        
-        let futureResult = dnsClient.ipv6InverseAddress("this-is-not-a-valid-ip")
-        
-        futureResult.whenFailure { error in
-            // Optionally assert that the error is the specific type you expect.
-            XCTAssert(error is IOError, "The error should be an IOError")
-            // Fulfill the expectation to signal that the test completed successfully.
-            expectation.fulfill()
+    func testipv6InverseAddressInvalidInput() throws {
+        XCTAssertThrowsError(try dnsClient.ipv6InverseAddress(":::0").wait()) { error in
+            
+            #if os(Linux)
+            XCTAssertEqual(error.localizedDescription , "The operation could not be completed. (NIOCore.IOError error 1.)")
+            #else
+            XCTAssertEqual(error.localizedDescription , "The operation couldn’t be completed. (NIOCore.IOError error 1.)")
+            #endif
         }
-        
-        futureResult.whenSuccess { _ in
-            XCTFail("ipv6InverseAddress should have failed for an invalid IP, but it succeeded.")
-        }
-        
-        waitForExpectations(timeout: 2)
     }
     
     func testPTRRecordDescription() throws {
