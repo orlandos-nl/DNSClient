@@ -1,12 +1,13 @@
+import DNSMessage
 import NIO
 import NIOConcurrencyHelpers
 
 final class EnvelopeInboundChannel: ChannelInboundHandler {
     typealias InboundIn = AddressedEnvelope<ByteBuffer>
     typealias InboundOut = ByteBuffer
-    
+
     init() {}
-    
+
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let buffer = unwrapInboundIn(data).data
         context.fireChannelRead(wrapInboundOut(buffer))
@@ -25,7 +26,7 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
 
     public typealias InboundIn = ByteBuffer
     public typealias OutboundOut = Never
-    
+
     public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let message: Message
 

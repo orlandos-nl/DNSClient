@@ -1,6 +1,6 @@
 import NIO
 
-fileprivate let nameserverPrefix = "nameserver"
+private let nameserverPrefix = "nameserver"
 
 /// A struct representing the contents of a resolv.conf file.
 struct ResolvConf {

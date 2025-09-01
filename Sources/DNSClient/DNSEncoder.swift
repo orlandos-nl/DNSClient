@@ -1,15 +1,16 @@
+import DNSMessage
 import NIO
 
 final class EnvelopeOutboundChannel: ChannelOutboundHandler {
     typealias OutboundIn = ByteBuffer
     typealias OutboundOut = AddressedEnvelope<ByteBuffer>
-    
+
     let address: SocketAddress
-    
+
     init(address: SocketAddress) {
         self.address = address
     }
-    
+
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         let buffer = unwrapOutboundIn(data)
         let envelope = AddressedEnvelope(remoteAddress: address, data: buffer)
@@ -19,7 +20,7 @@ final class EnvelopeOutboundChannel: ChannelOutboundHandler {
 
 final class UInt16FrameDecoder: ByteToMessageDecoder {
     typealias InboundOut = ByteBuffer
-    
+
     func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
         var readBuffer = buffer
         guard
@@ -28,12 +29,12 @@ final class UInt16FrameDecoder: ByteToMessageDecoder {
         else {
             return .needMoreData
         }
-        
+
         buffer.moveReaderIndex(to: readBuffer.readerIndex)
         context.fireChannelRead(wrapInboundOut(slice))
         return .continue
     }
-    
+
     func decodeLast(context: ChannelHandlerContext, buffer: inout ByteBuffer, seenEOF: Bool) throws -> DecodingState {
         try decode(context: context, buffer: &buffer)
     }
@@ -66,7 +67,7 @@ public final class DNSEncoder: ChannelOutboundHandler {
             context.fireErrorCaught(error)
         }
     }
-    
+
     public static func encodeMessage(
         _ message: Message,
         allocator: ByteBufferAllocator,
