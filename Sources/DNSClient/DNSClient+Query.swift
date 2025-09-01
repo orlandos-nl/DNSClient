@@ -100,15 +100,17 @@ extension DNSClient {
 
     /// Send a question to the dns host
     ///
-    /// - parameters:
+    /// - Parameters:
     ///     - address: The hostname address to request a certain resource from
     ///     - type: The resource you want to request
     ///     - additionalOptions: Additional message options
-    /// - returns: A future with the response message
+    ///     - timeout: Timeout for this query (default: 30s to preserve existing behavior)
+    /// - Returns: A future with the response message
     public func sendQuery(
         forHost address: String,
         type: DNSResourceType,
-        additionalOptions: MessageOptions? = nil
+        additionalOptions: MessageOptions? = nil,
+        timeout: TimeAmount = .seconds(30)
     ) -> EventLoopFuture<Message> {
         channel.eventLoop.flatSubmit {
             let messageID = self.messageID.withLockedValue { id in
@@ -145,23 +147,52 @@ extension DNSClient {
                 additionalData: []
             )
 
-            return self.send(message)
+            return self.send(message, to: nil, timeout: timeout)
         }
     }
 
+    // MARK: - Transport primitive (timeout-aware overload + wrapper)
+
+    /// Historical behavior wrapper (30s default); forwards to timeout-aware overload.
+    /// Keeping this avoids any source change for existing callers.
     func send(_ message: Message, to address: SocketAddress? = nil) -> EventLoopFuture<Message> {
+        self.send(message, to: address, timeout: .seconds(30))
+    }
+
+    /// Timeout-aware transport primitive with proper cancellation and cache cleanup.
+    ///
+    /// Timers are canceled on success, and in‑flight entries are removed on timeout.
+    ///
+    /// - Parameters:
+    ///   - message: The complete DNS `Message` to be sent as a query.
+    ///   - address: The destination `SocketAddress` for this specific query. If `nil`, the client's
+    ///              default server address is used.
+    ///   - timeout: The maximum `TimeAmount` to wait for a response before the returned future
+    ///              fails with a timeout error.
+    /// - Returns: An `EventLoopFuture<Message>` that will be fulfilled with the server's
+    ///           response message, or fail if an error occurs (e.g., a timeout).
+    func send(_ message: Message, to address: SocketAddress? = nil, timeout: TimeAmount) -> EventLoopFuture<Message> {
         let promise: EventLoopPromise<Message> = loop.makePromise()
 
         return loop.flatSubmit {
+            // Register in-flight
             self.dnsDecoder.messageCache.withLockedValue { cache in
                 cache[message.header.id] = SentQuery(message: message, promise: promise)
             }
+
+            // Write on the channel
             self.channel.writeAndFlush(message, promise: nil)
 
             struct DNSTimeoutError: Error {}
 
             self.loop.scheduleTask(in: .seconds(30)) {
                 promise.fail(DNSTimeoutError())
+            }
+
+            // Ensure timer is cancelled once the promise resolves
+            promise.futureResult.whenComplete { _ in
+                // a successful promise cancels, a failed promise canceled is a no-op.
+                timeoutTask.cancel()
             }
 
             return promise.futureResult
@@ -179,6 +210,36 @@ extension DNSClient {
                 guard case .srv(let record) = answer else {
                     return nil
                 }
+
+                return record
+            }
+        }
+    }
+
+    /// Request NS records for a domain
+    ///
+    /// - parameters:
+    ///     - host: Hostname to get the records from
+    /// - returns: A future with an array of resource records
+    public func initiateNSQuery(forDomain domain: String) -> EventLoopFuture<[ResourceRecord<NSRecord>]> {
+        self.sendQuery(forHost: domain, type: .ns).map { message in
+            message.answers.compactMap { answer in
+                guard case .ns(let record) = answer else { return nil }
+
+                return record
+            }
+        }
+    }
+
+    /// Request SOA records from a host
+    ///
+    /// - parameters:
+    ///     - host: Hostname to get the records from
+    /// - returns: A future with an array of resource records
+    public func initiateSOAQuery(forDomain domain: String) -> EventLoopFuture<[ResourceRecord<SOARecord>]> {
+        self.sendQuery(forHost: domain, type: .soa).map { message in
+            message.answers.compactMap { answer in
+                guard case .soa(let record) = answer else { return nil }
 
                 return record
             }

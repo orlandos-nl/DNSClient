@@ -51,6 +51,10 @@ extension ByteBuffer {
             try writeRecord(resourceRecord, labelIndices: &labelIndices)
         case .ptr(let resourceRecord):
             try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .ns(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
+        case .soa(let resourceRecord):
+            try writeRecord(resourceRecord, labelIndices: &labelIndices)
         case .other(let resourceRecord):
             try writeRecord(resourceRecord, labelIndices: &labelIndices)
         }

@@ -72,6 +72,12 @@ public enum Record {
     /// A domain name pointer (ie. in-addr.arpa)
     case ptr(ResourceRecord<PTRRecord>)
 
+    /// an authoritative name server
+    case ns(ResourceRecord<NSRecord>)
+
+    /// marks the start of authority for a zone
+    case soa(ResourceRecord<SOARecord>)
+
     /// Any other record. This is used for records that are not yet supported through convenience methods.
     case other(ResourceRecord<ByteBuffer>)
 }

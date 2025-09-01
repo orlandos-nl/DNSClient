@@ -1,7 +1,7 @@
 /// The type of resource record. This is used to determine the format of the record.
 ///
 /// The official standard list of all Resource Record (RR) Types. [IANA](https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4)
-public enum DNSResourceType: UInt16 {
+public enum DNSResourceType: UInt16, Sendable {
     /// A request for an IPv4 address
     case a = 1
 
@@ -73,7 +73,7 @@ public enum DNSResourceType: UInt16 {
 public typealias QuestionType = DNSResourceType
 
 /// The class of the resource record. This is used to determine the format of the record.
-public enum DataClass: UInt16 {
+public enum DataClass: UInt16, Sendable {
     /// The Internet
     case internet = 1
 

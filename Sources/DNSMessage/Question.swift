@@ -1,4 +1,4 @@
-public struct QuestionSection {
+public struct QuestionSection: Sendable {
     public let labels: [DNSLabel]
     public let type: QuestionType
     public let questionClass: DataClass

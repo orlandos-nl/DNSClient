@@ -1,4 +1,4 @@
-# NioDNS
+# DNSClient
 
 Async DNS resolution, with all the DNS features you need!
 

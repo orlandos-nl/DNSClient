@@ -115,6 +115,23 @@ final class DNSUDPClientTests: XCTestCase {
         }
     }
 
+    func testNSQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateNSQuery(forDomain: "example.com").wait()
+            XCTAssertEqual(results.count, 2)
+            let names = results.map { $0.resource.labels.string }.sorted()
+            XCTAssertEqual(names, ["a.iana-servers.net", "b.iana-servers.net"])
+        }
+    }
+
+    func testSOAQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateSOAQuery(forDomain: "example.com").wait()
+            XCTAssertEqual(results.count, 1)
+            XCTAssertEqual(results.first?.resource.mname.string, "ns.icann.org")
+        }
+    }
+
     func testSRVRecordsAsyncRequest() throws {
         testClient { dnsClient in
             let expectation = self.expectation(description: "getSRVRecords")

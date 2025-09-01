@@ -37,7 +37,7 @@
 /// which relate to the query, but are not strictly answers for the
 /// question.
 /// ```
-public struct DNSMessage {
+public struct DNSMessage: Sendable {
     public var header: DNSHeader
     public var questions: [QuestionSection]
     public var answers: [Record]
