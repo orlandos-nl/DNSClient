@@ -61,20 +61,25 @@ extension DNSClient {
     ///  An IPv6 address "2001:503:c27::2:30" is transformed into an inverse domain, then DNS query performed to get associated domain name.
     ///  0.3.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.7.2.c.0.3.0.5.0.1.0.0.2.ip6.arpa    domainname = j.root-servers.net.
     ///
-    /// - Parameter address: IPv6 Address in long or compressed zero format
-    /// - Returns: A future with the resource record containing a domain name associated with the IPv6 Address.
-    /// - Throws: IOError(errnoCode: EINVAL, reason: #function) , IOError(errnoCode: errno, reason: #function)
-    public func ipv6InverseAddress(_ address: String) throws -> EventLoopFuture<[ResourceRecord<PTRRecord>]> {
+    /// - Parameter address: IPv6 Address in long or compressed zero format. If the string is not a
+    ///                     valid IPv6 address, the returned future will fail immediately.
+    /// - Returns: A future that will be fulfilled with an array of resource records containing the domain
+    ///            names associated with the IPv6 address. The future will fail if the input address
+    ///            is invalid or if a network error occurs.
+    public func ipv6InverseAddress(_ address: String) -> EventLoopFuture<[ResourceRecord<PTRRecord>]> {
         var ipv6Addr = in6_addr()
         
         let retval = withUnsafeMutablePointer(to: &ipv6Addr) {
             inet_pton(AF_INET6, address, UnsafeMutablePointer($0))
         }
         
+        // If inet_pton fails, return a pre-failed future immediately.
         if retval == 0 {
-            throw IOError(errnoCode: EINVAL, reason: #function)
+            let error = IOError(errnoCode: EINVAL, reason: #function)
+            return self.loop.makeFailedFuture(error)
         } else if retval == -1 {
-            throw IOError(errnoCode: errno, reason: #function)
+            let error = IOError(errnoCode: errno, reason: #function)
+            return self.loop.makeFailedFuture(error)
         }
         
         #if canImport(Glibc)

@@ -175,8 +175,84 @@ public enum Record {
     /// A domain name pointer (ie. in-addr.arpa)
     case ptr(ResourceRecord<PTRRecord>)
     
+    /// an authoritative name server
+    case ns(ResourceRecord<NSRecord>)
+    
+    /// marks the start of authority for a zone
+    case soa(ResourceRecord<SOARecord>)
+    
     /// Any other record. This is used for records that are not yet supported through convenience methods.
     case other(ResourceRecord<ByteBuffer>)
+}
+
+/// NS Record - an authoritative name server
+/// /// 3.3.11. SOA RDATA format - https://www.rfc-editor.org/rfc/rfc1035.html
+public struct NSRecord: DNSResource {
+    public let labels: [DNSLabel]
+    
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> NSRecord? {
+        guard let labels = buffer.readLabels() else { return nil }
+        return NSRecord(labels: labels)
+    }
+    
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
+        buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+    }
+}
+
+/// SOA Record - marks the start of a zone of authority
+/// 3.3.13. SOA RDATA format - https://www.rfc-editor.org/rfc/rfc1035.html
+///
+public struct SOARecord: DNSResource {
+    // Main Name Server - specifies the fully qualified domain name (FQDN)
+    // of the authoritative name server for the zone that holds the master copy of the zone file.
+    public let mname: [DNSLabel]
+    
+    // Responsible Person Name - and specifies the email address of the administrator responsible
+    // for the DNS zone. This field contains an email address but without the "@" symbol,
+    // where the first unescaped dot (.) is interpreted as an "@" sign
+    public let rname: [DNSLabel]
+    
+    // Serial Number - This is a version number for the zone file,
+    // a database that contains all of the DNS records for a domain.
+    public let serialNumber: UInt32
+    
+    public let refreshInterval: UInt32
+    public let retryInterval: UInt32
+    public let expireInterval: UInt32
+    public let minimumTTL: UInt32
+    
+    public static func read(from buffer: inout ByteBuffer, length: Int) -> SOARecord? {
+        guard
+            let mname = buffer.readLabels(),
+            let rname = buffer.readLabels(),
+            let serial  = buffer.readInteger(endianness: .big, as: UInt32.self),
+            let refresh = buffer.readInteger(endianness: .big, as: UInt32.self),
+            let retry   = buffer.readInteger(endianness: .big, as: UInt32.self),
+            let expire  = buffer.readInteger(endianness: .big, as: UInt32.self),
+            let minimum = buffer.readInteger(endianness: .big, as: UInt32.self)
+        else { return nil }
+        
+        return SOARecord( mname: mname,
+                         rname: rname,
+                         serialNumber: serial,
+                         refreshInterval: refresh,
+                         retryInterval: retry,
+                         expireInterval: expire,
+                         minimumTTL: minimum)
+    }
+    
+    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
+        var written = 0
+        written += buffer.writeCompressedLabels(mname, labelIndices: &labelIndices)
+        written += buffer.writeCompressedLabels(rname, labelIndices: &labelIndices)
+        written += buffer.writeInteger(serialNumber)
+        written += buffer.writeInteger(refreshInterval)
+        written += buffer.writeInteger(retryInterval)
+        written += buffer.writeInteger(expireInterval)
+        written += buffer.writeInteger(minimumTTL)
+        return written
+    }
 }
 
 /// A text record. This is used for storing arbitrary text.
@@ -319,6 +395,9 @@ public struct AAAARecord: DNSResource {
 }
 
 /// A structure representing a DNS resource record. This is used for storing the data of a DNS record.
+///
+/// IETF RFC 1035 Section 3.3 - Because their RDATA format (NS, SOA, CNAME, and PTR) is known,
+/// all domain names in the RDATA section of these RRs may be compressed.
 public struct ResourceRecord<Resource: DNSResource>: Sendable {
     /// The name of the record.
     public let domainName: [DNSLabel]
@@ -367,34 +446,6 @@ extension ByteBuffer: DNSResource {
     }
 }
 
-fileprivate struct InvalidSOARecord: Error {}
-
-/// An extension to `ResourceRecord` that adds a method for parsing a SOA record.
-extension ResourceRecord where Resource == ByteBuffer {
-    mutating func parseSOA() throws -> ZoneAuthority {
-        guard
-            let domainName = resource.readLabels(),
-            resource.readableBytes >= 20, // Minimum 5 UInt32's
-            let serial: UInt32 = resource.readInteger(endianness: .big),
-            let refresh: UInt32 = resource.readInteger(endianness: .big),
-            let retry: UInt32 = resource.readInteger(endianness: .big),
-            let expire: UInt32 = resource.readInteger(endianness: .big),
-            let minimumExpire: UInt32 = resource.readInteger(endianness: .big)
-        else {
-            throw InvalidSOARecord()
-        }
-        
-        return ZoneAuthority(
-            domainName: domainName,
-            adminMail: "",
-            serial: serial,
-            refreshInterval: refresh,
-            retryTimeinterval: retry,
-            expireTimeout: expire,
-            minimumExpireTimeout: minimumExpire
-        )
-    }
-}
 
 extension UInt32 {
     /// Converts the UInt32 to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
@@ -406,15 +457,6 @@ extension UInt32 {
     }
 }
 
-struct ZoneAuthority {
-    let domainName: [DNSLabel]
-    let adminMail: String
-    let serial: UInt32
-    let refreshInterval: UInt32
-    let retryTimeinterval: UInt32
-    let expireTimeout: UInt32
-    let minimumExpireTimeout: UInt32
-}
 
 extension Sequence where Element == DNSLabel {
     /// Converts a sequence of DNS labels to a string.

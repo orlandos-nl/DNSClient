@@ -103,6 +103,23 @@ final class DNSUDPClientTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
         }
     }
+
+    func testNSQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateNSQuery(forDomain: "example.com").wait()
+            XCTAssertEqual(results.count, 2)
+            let names = results.map { $0.resource.labels.string }.sorted()
+            XCTAssertEqual(names, ["a.iana-servers.net", "b.iana-servers.net"])
+        }
+    }
+
+    func testSOAQuery() throws {
+        try testClient { dnsClient in
+            let results = try dnsClient.initiateSOAQuery(forDomain: "example.com").wait()
+            XCTAssertEqual(results.count, 1)
+            XCTAssertEqual(results.first?.resource.mname.string, "ns.icann.org")
+        }
+    }
     
     func testSRVRecordsAsyncRequest() throws {
         testClient { dnsClient in
