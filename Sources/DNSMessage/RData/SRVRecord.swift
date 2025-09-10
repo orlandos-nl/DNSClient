@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 /// A DNS SRV record. This is used to specify the location of a service.
 public struct SRVRecord: DNSResource {
