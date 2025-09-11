@@ -10,9 +10,9 @@ public struct DNSDecoder {
     /// Reads a character-string from the buffer.
     /// A character-string is a single length octet followed by that number of characters.
     /// Character-strings can be up to 255 characters in length (not including the length octet).
-    /// - Returns: The character-string bytes (without the length prefix)
+    /// - Returns: A CharacterString containing the decoded data
     /// - Throws: DNSMessageError if insufficient data or invalid format
-    public mutating func readCharacterString() throws -> [UInt8] {
+    public mutating func readCharacterString() throws -> DNSCharacterString {
         guard let length: UInt8 = buffer.readInteger() else {
             throw DNSMessageError.insufficientData(expected: 1, available: buffer.readableBytes)
         }
@@ -24,7 +24,7 @@ public struct DNSDecoder {
             )
         }
 
-        return data
+        return try DNSCharacterString(bytes: data)
     }
 
     /// Reads a DNS name from the buffer, handling label compression.

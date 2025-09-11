@@ -42,9 +42,3 @@ extension SocketAddress {
         )
     }
 }
-
-extension String {
-    internal var isValidCharacterString: Bool {
-        self.utf8.count <= UInt8.max
-    }
-}

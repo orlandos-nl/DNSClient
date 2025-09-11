@@ -108,47 +108,26 @@ import NIOCore
 ///   greatest number of clients.
 /// ```
 public struct SVCALPN: SVCParamValue {
-    public internal(set) var alpns: [[UInt8]]
+    public var alpns: [DNSCharacterString]
 
     public var description: String {
-        self.alpns.lazy.map({
-            String(bytes: $0, encoding: .utf8) ?? "<invalid ALPN>"
-        }).joined(separator: ",")
+        alpns.map({ $0.description }).joined(separator: ",")
     }
 
     public static let correspondingKey: SVCParamKey = .alpn
     public static let name: String = "alpn"
 
-    public init(alpns: [[UInt8]]) throws {
+    public init(alpns: [DNSCharacterString]) throws {
         guard !alpns.isEmpty else {
             throw DNSMessageError.emptyRequiredCollection("SVC ALPN alpns")
-        }
-
-        for alpn in alpns {
-            guard !alpn.isEmpty && alpn.count <= 255 else {
-                throw DNSMessageError.invalidFormat(field: "SVC ALPN alpn", reason: "each ALPN must be 1-255 octets")
-            }
         }
 
         self.alpns = alpns
     }
 
     public init(alpnStrings: [String]) throws {
-        guard !alpnStrings.isEmpty else {
-            throw DNSMessageError.emptyRequiredCollection("SVC ALPN alpns")
-        }
-
-        var alpns: [[UInt8]] = []
-
-        for alpnString in alpnStrings {
-            let bytes = Array(alpnString.utf8)
-            guard !bytes.isEmpty && bytes.count <= 255 else {
-                throw DNSMessageError.invalidFormat(field: "SVC ALPN alpn", reason: "each ALPN must be 1-255 octets")
-            }
-            alpns.append(bytes)
-        }
-
-        self.alpns = alpns
+        let alpns = try alpnStrings.map { try DNSCharacterString(string: $0) }
+        try self.init(alpns: alpns)
     }
 
     public init(commaSeparatedALPNs: String) throws {
@@ -162,15 +141,12 @@ public struct SVCALPN: SVCParamValue {
         }
 
         var remainingLength = length
-        var alpns: [[UInt8]] = []
+        var alpns: [DNSCharacterString] = []
 
         while remainingLength > 0 {
             let alpn = try decoder.readCharacterString()
-            guard !alpn.isEmpty else {
-                throw DNSMessageError.invalidFormat(field: "SVC ALPN", reason: "each ALPN must be 1-255 octets")
-            }
+            remainingLength -= alpn.count + 1
             alpns.append(alpn)
-            remainingLength -= Int(alpn.count) + 1
         }
 
         self.alpns = alpns

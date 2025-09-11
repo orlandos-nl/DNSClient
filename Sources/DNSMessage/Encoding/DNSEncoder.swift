@@ -153,12 +153,12 @@ public struct DNSEncoder {
     /// Writes a character-string to the buffer with length prefix.
     /// A character-string is a single length octet followed by that number of characters.
     /// Character-strings can be up to 255 characters in length (not including the length octet).
-    /// - Parameter data: The character-string data (must be <= 255 bytes)
+    /// - Parameter characterString: The CharacterString to write
     /// - Returns: The number of bytes written (data length + 1 for length prefix)
     /// - Throws: DNSMessageError if data exceeds 255 bytes
-    public mutating func writeCharacterString(_ data: [UInt8]) throws -> Int {
+    public mutating func writeCharacterString(_ characterString: DNSCharacterString) throws -> Int {
         try buffer.writeLengthPrefixed(as: UInt8.self) { buffer in
-            buffer.writeBytes(data)
+            buffer.writeBytes(characterString.bytes)
         }
     }
 
