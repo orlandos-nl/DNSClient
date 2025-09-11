@@ -1,83 +1,228 @@
 import NIOCore
 
 /// A protocol that can be used to read a DNS resource from a buffer.
-public protocol DNSResource: Sendable {
-    static func read(from buffer: inout ByteBuffer, length: Int) -> Self?
-    func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int
+public protocol DNSResourceData: Sendable, CustomStringConvertible, Equatable {
+    static var encoding: DNSRDataEncoding { get }
+    static var resourceType: DNSResourceType { get }
+
+    /// The string name of the DNS resource type
+    static var name: String { get }
+
+    init(from decoder: inout DNSDecoder, length: Int) throws
+    func write(encoder: inout DNSEncoder) throws -> Int
+
+    func isEqual(to other: any DNSResourceData) -> Bool
 }
 
-/// A structure representing a DNS resource record. This is used for storing the data of a DNS record.
-public struct ResourceRecord<Resource: DNSResource>: Sendable {
-    /// The name of the record.
-    public let domainName: [DNSLabel]
+extension DNSResourceData {
+    public func isEqual(to other: any DNSResourceData) -> Bool {
+        guard let other = other as? Self else { return false }
+        return self == other
+    }
+}
 
-    /// The type of the record. See `RecordType` for more information.
-    public let dataType: UInt16
+/// Determines how DNS resource record data (RDATA) should be encoded, particularly how domain names
+/// within the RDATA are handled. The encoding rules evolved over time through various RFCs.
+public struct DNSRDataEncoding: Equatable, Hashable, Sendable {
+    public internal(set) var rawValue: UInt8
 
-    /// The class of the record. This is usually 1 for internet. See `DataClass` for more information.
-    public let dataClass: UInt16
+    public static var standardRecord: Self { .init(rawValue: 0) }
+    public static var other: Self { .init(rawValue: 1) }
+    public static var canonical: Self { .init(rawValue: 2) }
 
-    /// The time to live of the record. This is the amount of time the record should be cached for.
-    public let ttl: UInt32
+    func toNameEncoding() -> DNSNameEncoding {
+        switch self {
+        case .standardRecord:
+            return .compressed
+        case .other:
+            return .uncompressed
+        case .canonical:
+            return .uncompressedLowercase
+        default:
+            return .uncompressedLowercase
+        }
+    }
+}
 
-    /// The resource of the record. This is the data of the record.
-    public var resource: Resource
+/// [RFC 1035 DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION](https://tools.ietf.org/html/rfc1035)
+///
+/// ```txt
+/// All RRs have the same top level format shown below:
+///
+///                                     1  1  1  1  1  1
+///       0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                                               |
+///     /                                               /
+///     /                      NAME                     /
+///     |                                               |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                      TYPE                     |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                     CLASS                     |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                      TTL                      |
+///     |                                               |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                   RDLENGTH                    |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+///     /                     RDATA                     /
+///     /                                               /
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///
+///
+/// where:
+///
+/// NAME            an owner name, i.e., the name of the node to which this
+///                 resource record pertains.
+///
+/// TYPE            two octets containing one of the RR TYPE codes.
+///
+/// CLASS           two octets containing one of the RR CLASS codes.
+///
+/// TTL             a 32 bit signed integer that specifies the time interval
+///                 that the resource record may be cached before the source
+///                 of the information should again be consulted.  Zero
+///                 values are interpreted to mean that the RR can only be
+///                 used for the transaction in progress, and should not be
+///                 cached.  For example, SOA records are always distributed
+///                 with a zero TTL to prohibit caching.  Zero values can
+///                 also be used for extremely volatile data.
+///
+/// RDLENGTH        an unsigned 16 bit integer that specifies the length in
+///                 octets of the RDATA field.
+///
+/// RDATA           a variable length string of octets that describes the
+///                 resource.  The format of this information varies
+///                 according to the TYPE and CLASS of the resource record.
+/// ```
+public struct DNSResourceRecord<ResourceData: DNSResourceData>: CustomStringConvertible, Equatable, Sendable {
+    public var name: DNSName
+    public var rrType: DNSResourceType
+    public var recordClass: DNSClass
+    public var ttl: UInt32
+    public var rData: ResourceData
+
+    public var description: String {
+        "\(self.name) \(self.ttl) \(String(describing: self.recordClass)) \(ResourceData.name) \(String(describing: self.rData))"
+    }
 
     public init(
-        domainName: [DNSLabel],
-        dataType: UInt16,
-        dataClass: UInt16,
+        name: DNSName,
+        rrType: DNSResourceType,
+        recordClass: DNSClass,
         ttl: UInt32,
-        resource: Resource
-    ) {
-        self.domainName = domainName
-        self.dataType = dataType
-        self.dataClass = dataClass
+        rData: ResourceData
+    ) throws {
+        guard rrType.isValidInRR else {
+            throw DNSMessageError.invalidResourceRecordType(rrType)
+        }
+
+        self.name = name
+        self.rrType = rrType
+        self.recordClass = recordClass
         self.ttl = ttl
-        self.resource = resource
+        self.rData = rData
     }
 }
 
-/// An extension to `ByteBuffer` that adds a method for reading a DNS resource.
-extension ByteBuffer: DNSResource {
-    public static func read(from buffer: inout ByteBuffer, length: Int) -> ByteBuffer? {
-        buffer.readSlice(length: length)
+public struct DNSRecord: Sendable, Equatable, CustomStringConvertible {
+    public var name: DNSName
+    public var rrType: DNSResourceType
+    public var recordClass: DNSClass
+    public var ttl: UInt32
+    public var rData: any DNSResourceData
+
+    public func rData<T: DNSResourceData>(as type: T.Type) -> T? {
+        rData as? T
     }
 
-    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        buffer.writeImmutableBuffer(self)
+    public func asResourceRecord<T: DNSResourceData>(_ type: T.Type) -> DNSResourceRecord<T>? {
+        guard let typedData = rData as? T else { return nil }
+        return try? DNSResourceRecord(
+            name: self.name,
+            rrType: self.rrType,
+            recordClass: self.recordClass,
+            ttl: self.ttl,
+            rData: typedData
+        )
+    }
+
+    public var description: String {
+        "\(self.name) \(self.ttl) \(String(describing: self.recordClass)) \(DNSResourceType.getTypeName(for: self.rrType)) \(String(describing: self.rData))"
+    }
+
+    public init<ResourceData: DNSResourceData>(_ record: DNSResourceRecord<ResourceData>) {
+        self.name = record.name
+        self.rrType = record.rrType
+        self.recordClass = record.recordClass
+        self.ttl = record.ttl
+        self.rData = record.rData
+    }
+
+    public init(
+        name: DNSName,
+        rrType: DNSResourceType,
+        dnsClass: DNSClass,
+        ttl: UInt32,
+        rData: any DNSResourceData
+    ) throws {
+        guard rrType.isValidInRR else {
+            throw DNSMessageError.invalidResourceRecordType(rrType)
+        }
+
+        self.name = name
+        self.rrType = rrType
+        self.recordClass = dnsClass
+        self.ttl = ttl
+        self.rData = rData
+    }
+
+    public static func == (lhs: DNSRecord, rhs: DNSRecord) -> Bool {
+        lhs.name == rhs.name && lhs.rrType == rhs.rrType && lhs.recordClass == rhs.recordClass
+            && lhs.ttl == rhs.ttl && lhs.rData.isEqual(to: rhs.rData)
+    }
+
+    public static func == <ResourceData: DNSResourceData>(
+        lhs: DNSRecord,
+        rhs: DNSResourceRecord<ResourceData>
+    ) -> Bool {
+        lhs.name == rhs.name && lhs.rrType == rhs.rrType && lhs.recordClass == rhs.recordClass
+            && lhs.ttl == rhs.ttl && lhs.rData.isEqual(to: rhs.rData)
+    }
+
+    public static func == <ResourceData: DNSResourceData>(
+        lhs: DNSResourceRecord<ResourceData>,
+        rhs: DNSRecord
+    ) -> Bool {
+        lhs.name == rhs.name && lhs.rrType == rhs.rrType && lhs.recordClass == rhs.recordClass
+            && lhs.ttl == rhs.ttl && lhs.rData.isEqual(to: rhs.rData)
     }
 }
 
-/// A DNS message. This is the main type used for interacting with the DNS protocol.
-public enum Record {
-    /// An IPv6 address record. This is used for resolving hostnames to IP addresses.
-    case aaaa(ResourceRecord<AAAARecord>)
+@available(
+    *,
+    deprecated,
+    message: """
+        ResourceRecord has been replaced with DNSResourceRecord for improved type safety and API consistency.
 
-    /// An IPv4 address record. This is used for resolving hostnames to IP addresses.
-    case a(ResourceRecord<ARecord>)
+        Migration guide:
+        - Use DNSResourceRecord<T> for typed records where T conforms to DNSResourceData
+        - Use DNSRecord for type-erased records
+        - Replace ResourceRecord<Resource> with DNSResourceRecord<ResourceData>
+        """
+)
+public typealias ResourceRecord = DNSResourceRecord
+@available(
+    *,
+    deprecated,
+    message: """
+        Record has been replaced with DNSRecord for improved type safety and API consistency.
 
-    /// A text record. This is used for storing arbitrary text.
-    case txt(ResourceRecord<TXTRecord>)
-
-    /// A CNAME record. This is used for aliasing hostnames.
-    case cname(ResourceRecord<CNAMERecord>)
-
-    /// A service record. This is used for service discovery.
-    case srv(ResourceRecord<SRVRecord>)
-
-    /// Mail exchange record. This is used for mail servers.
-    case mx(ResourceRecord<MXRecord>)
-
-    /// A domain name pointer (ie. in-addr.arpa)
-    case ptr(ResourceRecord<PTRRecord>)
-
-    /// an authoritative name server
-    case ns(ResourceRecord<NSRecord>)
-
-    /// marks the start of authority for a zone
-    case soa(ResourceRecord<SOARecord>)
-
-    /// Any other record. This is used for records that are not yet supported through convenience methods.
-    case other(ResourceRecord<ByteBuffer>)
-}
+        Migration guide:
+        - Use DNSRecord for type-erased records
+        - Use DNSResourceRecord<T> for typed records where T conforms to DNSResourceData
+        - Replace Record enum cases with DNSRecord instances
+        """
+)
+public typealias Record = DNSRecord

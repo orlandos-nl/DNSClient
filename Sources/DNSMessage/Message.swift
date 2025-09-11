@@ -37,19 +37,19 @@
 /// which relate to the query, but are not strictly answers for the
 /// question.
 /// ```
-public struct DNSMessage: Sendable {
+public struct DNSMessage: Sendable, Equatable {
     public var header: DNSHeader
-    public var questions: [QuestionSection]
-    public var answers: [Record]
-    public var authorities: [Record]
-    public var additionalData: [Record]
+    public var questions: [DNSQuestion]
+    public var answers: [DNSRecord]
+    public var authorities: [DNSRecord]
+    public var additionalData: [DNSRecord]
 
     public init(
         header: DNSHeader,
-        questions: [QuestionSection] = [],
-        answers: [Record] = [],
-        authorities: [Record] = [],
-        additionalData: [Record] = []
+        questions: [DNSQuestion] = [],
+        answers: [DNSRecord] = [],
+        authorities: [DNSRecord] = [],
+        additionalData: [DNSRecord] = []
     ) {
         self.header = header
         self.questions = questions
