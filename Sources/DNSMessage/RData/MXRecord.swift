@@ -1,25 +1,60 @@
 import NIOCore
 
-/// A mail exchange record. This is used for mail servers.
-public struct MXRecord: DNSResource {
-    /// The preference of the mail server. This is used to determine which mail server to use.
-    public let preference: Int
+/// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987](https://tools.ietf.org/html/rfc1035)
+///
+/// 3.3.9. MX RDATA format
+///
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     |                  PREFERENCE                   |
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     /                   EXCHANGE                    /
+///     /                                               /
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///
+/// where:
+///
+/// PREFERENCE      A 16 bit integer which specifies the preference given to
+///                 this RR among others at the same owner.  Lower values
+///                 are preferred.
+///
+/// EXCHANGE        A <domain-name> which specifies a host willing to act as
+///                 a mail exchange for the owner name.
+///
+/// MX records cause type A additional section processing for the host
+/// specified by EXCHANGE.  The use of MX RRs is explained in detail in
+/// [RFC-974].
+public struct MXRecord: DNSResourceData {
+    public var preference: UInt16
+    public var exchange: DNSName
 
-    /// The labels of the mail server.
-    public let labels: [DNSLabel]
-
-    public static func read(from buffer: inout ByteBuffer, length: Int) -> MXRecord? {
-        guard let preference = buffer.readInteger(endianness: .big, as: UInt16.self) else { return nil }
-
-        guard let labels = buffer.readLabels() else {
-            return nil
-        }
-
-        return MXRecord(preference: Int(preference), labels: labels)
+    public var description: String {
+        "\(self.preference) \(self.exchange)"
     }
 
-    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        let length = buffer.writeInteger(preference)
-        return length + buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+    public static let name: String = "MX"
+    public static let encoding: DNSRDataEncoding = .standardRecord
+    public static let resourceType: DNSResourceType = .mx
+
+    public init(preference: UInt16, exchange: DNSName) {
+        self.preference = preference
+        self.exchange = exchange
+    }
+
+    public init(from decoder: inout DNSDecoder, length: Int) throws {
+        guard let preference: UInt16 = decoder.buffer.readInteger() else {
+            throw DNSMessageError.insufficientData(expected: 2, available: decoder.buffer.readableBytes)
+        }
+        self.preference = preference
+        self.exchange = DNSName()
+        try decoder.readDNSName(name: &self.exchange)
+    }
+
+    public func write(encoder: inout DNSEncoder) throws -> Int {
+        var written = 0
+
+        written += encoder.buffer.writeInteger(self.preference)
+        written += try encoder.writeDNSName(self.exchange)
+
+        return written
     }
 }

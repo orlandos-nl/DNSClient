@@ -1,28 +1,44 @@
 import NIOCore
 
-/// A DNS PTR record. This is used for address to name mapping.
-public struct PTRRecord: DNSResource {
-    /// A  domain-name which points to some location in the domain name space.
-    public let domainName: [DNSLabel]
+/// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987](https://tools.ietf.org/html/rfc1035)
+///
+/// 3.3.12. PTR RDATA format
+///
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     /                   PTRDNAME                    /
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///
+/// where:
+///
+/// PTRDNAME        A <domain-name> which points to some location in the
+///                 domain name space.
+///
+/// PTR records cause no additional section processing.  These RRs are used
+/// in special domains to point to some other location in the domain space.
+/// These records are simple data, and don't imply any special processing
+/// similar to that performed by CNAME, which identifies aliases.  See the
+/// description of the IN-ADDR.ARPA domain for an example.
+public struct PTRRecord: DNSResourceData {
+    public var ptrdname: DNSName
 
-    public static func read(from buffer: inout ByteBuffer, length: Int) -> PTRRecord? {
-        guard let domainName = buffer.readLabels() else {
-            return nil
-        }
-        return PTRRecord(domainName: domainName)
-    }
-
-    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
-    }
-
-    public init(domainName: [DNSLabel]) {
-        self.domainName = domainName
-    }
-}
-
-extension PTRRecord: CustomStringConvertible {
     public var description: String {
-        "\(Self.self): " + domainName.string
+        "\(String(describing: ptrdname))"
+    }
+
+    public static let name: String = "PTR"
+    public static let encoding: DNSRDataEncoding = .standardRecord
+    public static let resourceType: DNSResourceType = .ptr
+
+    public init(ptrdname: DNSName) {
+        self.ptrdname = ptrdname
+    }
+
+    public init(from decoder: inout DNSDecoder, length: Int) throws {
+        self.ptrdname = DNSName()
+        try decoder.readDNSName(name: &self.ptrdname)
+    }
+
+    public func write(encoder: inout DNSEncoder) throws -> Int {
+        try encoder.writeDNSName(self.ptrdname)
     }
 }
