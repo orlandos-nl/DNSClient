@@ -68,13 +68,13 @@ public struct SVCParamKey: Equatable, Hashable, Sendable {
         registeredParams[key]?.name ?? "key(\(key.rawValue))"
     }
 
-    public static let mandatory = Self(rawValue: 0)
-    public static let alpn = Self(rawValue: 1)
-    public static let noDefaultAlpn = Self(rawValue: 2)
-    public static let port = Self(rawValue: 3)
-    public static let ipv4Hint = Self(rawValue: 4)
-    public static let ipv6Hint = Self(rawValue: 6)
-    public static let ohttp = Self(rawValue: 8)
+    public static var mandatory: SVCParamKey { Self(rawValue: 0) }
+    public static var alpn: SVCParamKey { Self(rawValue: 1) }
+    public static var noDefaultAlpn: SVCParamKey { Self(rawValue: 2) }
+    public static var port: SVCParamKey { Self(rawValue: 3) }
+    public static var ipv4Hint: SVCParamKey { Self(rawValue: 4) }
+    public static var ipv6Hint: SVCParamKey { Self(rawValue: 6) }
+    public static var ohttp: SVCParamKey { Self(rawValue: 8) }
 
     public static func other(_ rawValue: UInt16) -> Self {
         Self(rawValue: rawValue)

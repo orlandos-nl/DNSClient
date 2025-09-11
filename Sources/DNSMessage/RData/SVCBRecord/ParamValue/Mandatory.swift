@@ -43,14 +43,14 @@ import NIOCore
 ///    and otherwise has no effect.)
 /// ```
 public struct SVCMandatory: SVCParamValue {
-    public internal(set) var keys: [SVCParamKey]
+    public var keys: [SVCParamKey]
 
     public var description: String {
         self.keys.lazy.map({ String(describing: $0) }).joined(separator: ",")
     }
 
-    public static var correspondingKey: SVCParamKey = .mandatory
-    public static let name: String = "mandatory"
+    public static var correspondingKey: SVCParamKey { .mandatory }
+    public static var name: String { "mandatory" }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
         guard length > 0 else {

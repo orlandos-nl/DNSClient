@@ -45,7 +45,7 @@ import NIOCore
 ///    to convey any performance benefit.
 /// ```
 public struct SVCIPv4Hint: SVCParamValue {
-    public let addresses: [ARecord]
+    public var addresses: [ARecord]
 
     public var description: String {
         self.addresses.lazy.map({
@@ -53,8 +53,8 @@ public struct SVCIPv4Hint: SVCParamValue {
         }).joined(separator: ",")
     }
 
-    public static var correspondingKey: SVCParamKey = .ipv4Hint
-    public static let name: String = "ipv4hint"
+    public static var correspondingKey: SVCParamKey { .ipv4Hint }
+    public static var name: String { "ipv4hint" }
 
     public init(addresses: [ARecord]) {
         self.addresses = addresses
@@ -93,7 +93,7 @@ public struct SVCIPv4Hint: SVCParamValue {
 
 /// See `SVCIPv4Hint`
 public struct SVCIPv6Hint: SVCParamValue {
-    public let addresses: [AAAARecord]
+    public var addresses: [AAAARecord]
 
     public var description: String {
         self.addresses.lazy.map({
@@ -101,8 +101,8 @@ public struct SVCIPv6Hint: SVCParamValue {
         }).joined(separator: ",")
     }
 
-    public static var correspondingKey: SVCParamKey = .ipv6Hint
-    public static let name: String = "ipv6hint"
+    public static var correspondingKey: SVCParamKey { .ipv6Hint }
+    public static var name: String { "ipv6hint" }
 
     public init(addresses: [AAAARecord]) {
         self.addresses = addresses

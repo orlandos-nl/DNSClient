@@ -24,9 +24,9 @@ public struct CNAMERecord: DNSResourceData {
         "\(String(describing: cname))"
     }
 
-    public static let name: String = "CNAME"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .cname
+    public static var name: String { "CNAME" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .cname }
 
     public init(cname: DNSName) {
         self.cname = cname

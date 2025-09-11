@@ -112,9 +112,9 @@ public struct SVCBRecord: DNSResourceData {
         return "\(self.svcPriority) \(self.targetName) \(params)"
     }
 
-    public static let name: String = "SVCB"
-    public static let encoding: DNSRDataEncoding = .other
-    public static let resourceType: DNSResourceType = .svcb
+    public static var name: String { "SVCB" }
+    public static var encoding: DNSRDataEncoding { .other }
+    public static var resourceType: DNSResourceType { .svcb }
 
     /// Initialize with specific values
     public init(

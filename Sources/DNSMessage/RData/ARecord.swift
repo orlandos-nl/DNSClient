@@ -20,9 +20,9 @@ public struct ARecord: DNSResourceData {
         "\(_socketAddress.ipAddress ?? "<invalid IPv4>")"
     }
 
-    public static let name: String = "A"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .a
+    public static var name: String { "A" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .a }
 
     public static func == (lhs: ARecord, rhs: ARecord) -> Bool {
         lhs.ipv4Address == rhs.ipv4Address

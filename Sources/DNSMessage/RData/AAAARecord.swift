@@ -23,9 +23,9 @@ public struct AAAARecord: DNSResourceData {
         "\(_socketAddress.ipAddress ?? "<invalid IPv6>")"
     }
 
-    public static let name: String = "AAAA"
-    public static let encoding: DNSRDataEncoding = .other
-    public static let resourceType: DNSResourceType = .aaaa
+    public static var name: String { "AAAA" }
+    public static var encoding: DNSRDataEncoding { .other }
+    public static var resourceType: DNSResourceType { .aaaa }
 
     public static func == (lhs: AAAARecord, rhs: AAAARecord) -> Bool {
         lhs.ipv6Address == rhs.ipv6Address

@@ -26,9 +26,9 @@ public struct NULLRecord: DNSResourceData {
         "\(data.map({ String(format: "%02X", $0) }).joined(separator: " "))"
     }
 
-    public static let name: String = "NULL"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .null
+    public static var name: String { "NULL" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .null }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
         guard let data = decoder.buffer.readBytes(length: length) else {

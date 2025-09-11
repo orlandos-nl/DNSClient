@@ -25,9 +25,9 @@ public struct PTRRecord: DNSResourceData {
         "\(String(describing: ptrdname))"
     }
 
-    public static let name: String = "PTR"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .ptr
+    public static var name: String { "PTR" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .ptr }
 
     public init(ptrdname: DNSName) {
         self.ptrdname = ptrdname

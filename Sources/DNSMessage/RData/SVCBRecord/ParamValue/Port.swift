@@ -24,12 +24,12 @@ import NIOCore
 ///    caution when using this SvcParamKey to specify a non-default port.
 /// ```
 public struct SVCPort: SVCParamValue {
-    public let port: UInt16
+    public var port: UInt16
 
     public var description: String { "\(self.port)" }
 
-    public static var correspondingKey: SVCParamKey = .port
-    public static let name: String = "port"
+    public static var correspondingKey: SVCParamKey { .port }
+    public static var name: String { "port" }
 
     public init(port: UInt16) {
         self.port = port

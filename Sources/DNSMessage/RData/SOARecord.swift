@@ -67,9 +67,9 @@ public struct SOARecord: DNSResourceData {
         "\(String(describing: mname)) \(String(describing: rname)) \(serialNumber) \(refreshInterval) \(retryInterval) \(expireInterval) \(minimumTTL)"
     }
 
-    public static let name: String = "SOA"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .soa
+    public static var name: String { "SOA" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .soa }
 
     public init(
         mname: DNSName,

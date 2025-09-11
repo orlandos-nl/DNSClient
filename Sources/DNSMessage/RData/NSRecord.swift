@@ -31,9 +31,9 @@ public struct NSRecord: DNSResourceData {
         "\(String(describing: nsdname))"
     }
 
-    public static let name: String = "NS"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .ns
+    public static var name: String { "NS" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .ns }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
         self.nsdname = DNSName()

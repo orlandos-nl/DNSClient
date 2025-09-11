@@ -15,27 +15,28 @@ public struct DNSResourceType: Equatable, Hashable, Sendable {
         .txt: TXTRecord.self,
         .aaaa: AAAARecord.self,
         .srv: SRVRecord.self,
+        // .OPT: OPTRecord.self,
         .svcb: SVCBRecord.self,
         .https: HTTPSRecord.self,
     ]
 
-    public static var a = Self(rawValue: 1)
-    public static let ns = Self(rawValue: 2)
-    public static let cname = Self(rawValue: 5)
-    public static let soa = Self(rawValue: 6)
-    public static let null = Self(rawValue: 10)
-    public static let ptr = Self(rawValue: 12)
-    public static let hinfo = Self(rawValue: 13)
-    public static let mx = Self(rawValue: 15)
-    public static let txt = Self(rawValue: 16)
-    public static let aaaa = Self(rawValue: 28)
-    public static let srv = Self(rawValue: 33)
-    public static let opt = Self(rawValue: 41)
-    public static let svcb = Self(rawValue: 64)
-    public static let https = Self(rawValue: 65)
-    public static let ixfr = Self(rawValue: 251)
-    public static let axfr = Self(rawValue: 252)
-    public static let any = Self(rawValue: 255)
+    public static var a: DNSResourceType { Self(rawValue: 1) }
+    public static var ns: DNSResourceType { Self(rawValue: 2) }
+    public static var cname: DNSResourceType { Self(rawValue: 5) }
+    public static var soa: DNSResourceType { Self(rawValue: 6) }
+    public static var null: DNSResourceType { Self(rawValue: 10) }
+    public static var ptr: DNSResourceType { Self(rawValue: 12) }
+    public static var hinfo: DNSResourceType { Self(rawValue: 13) }
+    public static var mx: DNSResourceType { Self(rawValue: 15) }
+    public static var txt: DNSResourceType { Self(rawValue: 16) }
+    public static var aaaa: DNSResourceType { Self(rawValue: 28) }
+    public static var srv: DNSResourceType { Self(rawValue: 33) }
+    public static var opt: DNSResourceType { Self(rawValue: 41) }
+    public static var svcb: DNSResourceType { Self(rawValue: 64) }
+    public static var https: DNSResourceType { Self(rawValue: 65) }
+    public static var ixfr: DNSResourceType { Self(rawValue: 251) }
+    public static var axfr: DNSResourceType { Self(rawValue: 252) }
+    public static var any: DNSResourceType { Self(rawValue: 255) }
 
     public init(rawValue: UInt16) {
         self.rawValue = rawValue

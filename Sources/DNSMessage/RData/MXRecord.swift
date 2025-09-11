@@ -31,9 +31,9 @@ public struct MXRecord: DNSResourceData {
         "\(self.preference) \(self.exchange)"
     }
 
-    public static let name: String = "MX"
-    public static let encoding: DNSRDataEncoding = .standardRecord
-    public static let resourceType: DNSResourceType = .mx
+    public static var name: String { "MX" }
+    public static var encoding: DNSRDataEncoding { .standardRecord }
+    public static var resourceType: DNSResourceType { .mx }
 
     public init(preference: UInt16, exchange: DNSName) {
         self.preference = preference

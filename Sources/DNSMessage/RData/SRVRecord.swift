@@ -10,9 +10,9 @@ public struct SRVRecord: DNSResourceData {
         "\(self.priority) \(self.weight) \(self.port) \(String(describing: self.target))"
     }
 
-    public static let name: String = "SRV"
-    public static let encoding: DNSRDataEncoding = .canonical
-    public static let resourceType: DNSResourceType = .srv
+    public static var name: String { "SRV" }
+    public static var encoding: DNSRDataEncoding { .canonical }
+    public static var resourceType: DNSResourceType { .srv }
 
     public init(priority: UInt16, weight: UInt16, port: UInt16, target: DNSName) {
         self.priority = priority

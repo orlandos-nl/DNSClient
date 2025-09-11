@@ -13,15 +13,15 @@ import NIOCore
 /// to be re-encoded identically even if the specific parameter semantics are unknown to this
 /// implementation.
 public struct SVCUnknown: SVCParamValue {
-    public let bytes: [UInt8]
+    public var bytes: [UInt8]
 
     public var description: String {
         "Unknown(\(Base64.encodeToString(bytes: self.bytes)))"
     }
 
     /// Uses UInt16.max as a placeholder key value since this represents any unknown parameter
-    public static var correspondingKey: SVCParamKey = .other(UInt16.max)
-    public static var name: String = "unknown"
+    public static var correspondingKey: SVCParamKey { .other(UInt16.max) }
+    public static var name: String { "unknown" }
 
     public init(bytes: [UInt8]) {
         self.bytes = bytes

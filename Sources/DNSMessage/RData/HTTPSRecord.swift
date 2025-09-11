@@ -45,27 +45,13 @@ public struct HTTPSRecord: DNSResourceData {
         }
     }
 
-    public static var encoding: DNSRDataEncoding = .other
-    public static var resourceType: DNSResourceType = .https
-
     public var description: String {
-        let params: String = self.svcParams.lazy.map { param in
-            let keyDescription = String(describing: param.key)
-            let valueDescription = String(describing: param.value)
-
-            if valueDescription.isEmpty {
-                return keyDescription
-            } else {
-                return "\(keyDescription)=\(valueDescription)"
-            }
-        }.joined(separator: " ")
-
-        return "\(svcPriority) \(targetName) \(params)"
+        "\(self.svcbRecord)"
     }
 
-    public static var name: String {
-        "HTTPS"
-    }
+    public static var encoding: DNSRDataEncoding { .other }
+    public static var resourceType: DNSResourceType { .https }
+    public static var name: String { "HTTPS" }
 
     /// Initialize with specific values
     public init(

@@ -36,8 +36,8 @@ import NIOCore
 public struct SVCObliviousHTTP: SVCParamValue {
     public var description: String { "" }  // Has no data
 
-    public static var correspondingKey: SVCParamKey = .ohttp
-    public static let name: String = "ohttp"
+    public static var correspondingKey: SVCParamKey { .ohttp }
+    public static var name: String { "ohttp" }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
         guard length == 0 else {
