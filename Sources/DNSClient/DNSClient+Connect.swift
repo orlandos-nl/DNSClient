@@ -1,5 +1,6 @@
 import Foundation
 import NIO
+public import NIOCore
 
 extension DNSClient {
     /// Connect to the dns server
@@ -95,12 +96,12 @@ extension DNSClient {
         if let remoteAddress = remoteAddress {
             return channel.pipeline.addHandlers(
                 EnvelopeInboundChannel(),
-                context.decoder,
+                context.inboundHandler,
                 EnvelopeOutboundChannel(address: remoteAddress),
-                DNSEncoder()
+                DNSClientOutboundHandler()
             )
         } else {
-            return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
+            return channel.pipeline.addHandlers(context.inboundHandler, DNSClientOutboundHandler())
         }
     }
 
@@ -114,7 +115,7 @@ extension DNSClient {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
@@ -122,9 +123,9 @@ extension DNSClient {
             .channelInitializer { channel in
                 channel.pipeline.addHandlers(
                     EnvelopeInboundChannel(),
-                    dnsDecoder,
+                    inboundHandler,
                     EnvelopeOutboundChannel(address: address),
-                    DNSEncoder()
+                    DNSClientOutboundHandler()
                 )
             }
 
@@ -134,10 +135,10 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -152,15 +153,15 @@ extension DNSClient {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         let bootstrap = ClientBootstrap(group: group)
             .channelInitializer { channel in
                 channel.pipeline.addHandlers(
                     ByteToMessageHandler(UInt16FrameDecoder()),
                     MessageToByteHandler(UInt16FrameEncoder()),
-                    dnsDecoder,
-                    DNSEncoder()
+                    inboundHandler,
+                    DNSClientOutboundHandler()
                 )
             }
 
@@ -168,10 +169,10 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -184,7 +185,7 @@ extension Array where Element == SocketAddress {
 }
 
 #if canImport(Network)
-import NIOTransportServices
+public import NIOTransportServices
 
 @available(iOS 12, *)
 extension DNSClient {
@@ -212,20 +213,20 @@ extension DNSClient {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         return NIOTSDatagramBootstrap(group: group).channelInitializer { channel in
-            channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+            channel.pipeline.addHandlers(inboundHandler, DNSClientOutboundHandler())
         }
         .connect(host: ipAddress, port: port)
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -267,14 +268,14 @@ extension DNSClient {
             return group.next().makeFailedFuture(MissingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
             channel.pipeline.addHandlers(
                 ByteToMessageHandler(UInt16FrameDecoder()),
                 MessageToByteHandler(UInt16FrameEncoder()),
-                dnsDecoder,
-                DNSEncoder()
+                inboundHandler,
+                DNSClientOutboundHandler()
             )
         }
         .connect(to: address)
@@ -282,10 +283,10 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
