@@ -37,25 +37,32 @@
 /// which relate to the query, but are not strictly answers for the
 /// question.
 /// ```
-public struct DNSMessage: Sendable, Equatable {
+public struct DNSMessage: Sendable {
     public var header: DNSHeader
     public var questions: [DNSQuestion]
-    public var answers: [DNSRecord]
-    public var authorities: [DNSRecord]
-    public var additionalData: [DNSRecord]
+    public var answers: [any DNSRecordProtocol]
+    public var authorities: [any DNSRecordProtocol]
+    public var additionalData: [any DNSRecordProtocol]
 
     public init(
         header: DNSHeader,
         questions: [DNSQuestion] = [],
-        answers: [DNSRecord] = [],
-        authorities: [DNSRecord] = [],
-        additionalData: [DNSRecord] = []
+        answers: [any DNSRecordProtocol] = [],
+        authorities: [any DNSRecordProtocol] = [],
+        additionalData: [any DNSRecordProtocol] = []
     ) {
         self.header = header
         self.questions = questions
         self.answers = answers
         self.authorities = authorities
         self.additionalData = additionalData
+    }
+
+    public func isEqual(_ other: DNSMessage) -> Bool {
+        header == other.header && questions == other.questions
+            && answers.elementsEqual(other.answers, by: { $0.isEqual($1) })
+            && authorities.elementsEqual(other.authorities, by: { $0.isEqual($1) })
+            && additionalData.elementsEqual(other.additionalData, by: { $0.isEqual($1) })
     }
 }
 

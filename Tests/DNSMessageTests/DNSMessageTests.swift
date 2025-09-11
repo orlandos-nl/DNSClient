@@ -39,7 +39,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertEqual(decodedMessage, originalMessage)
+        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
     }
 
     func testARecordRoundTrip() throws {
@@ -293,7 +293,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertEqual(decodedMessage, originalMessage)
+        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
     }
 
     func testDNSNameCompression() throws {
@@ -321,8 +321,8 @@ final class DNSMessageTests: XCTestCase {
         var decoder2 = DNSDecoder(buffer: uncompressedBuffer)
         let decodedUncompressed = try decoder2.readDNSMessage()
 
-        XCTAssertEqual(decodedCompressed, decodedUncompressed)
-        XCTAssertEqual(decodedCompressed, message)
+        XCTAssertTrue(decodedCompressed.isEqual(decodedUncompressed))
+        XCTAssertTrue(decodedCompressed.isEqual(message))
     }
 
     func testMultipleRecordTypesMessage() throws {
@@ -394,7 +394,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertEqual(decodedMessage, originalMessage)
+        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
     }
 
     func testEmptyMessage() throws {
@@ -409,6 +409,6 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertEqual(decodedMessage, originalMessage)
+        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
     }
 }

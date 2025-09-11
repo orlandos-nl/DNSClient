@@ -227,7 +227,7 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeDNSRecord(_ record: DNSRecord) throws -> Int {
+    private mutating func writeDNSRecord(_ record: any DNSRecordProtocol) throws -> Int {
         var written = 0
 
         // Write the DNS resource record header fields (RFC 1035 Section 3.2.1)
@@ -243,13 +243,13 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeRData(_ record: DNSRecord) throws -> Int {
+    private mutating func writeRData(_ record: any DNSRecordProtocol) throws -> Int {
         // Get encoding from registered type, fallback to standard if not registered
         let recordType = DNSResourceType.registeredType(for: record.rrType)
         let encoding: DNSRDataEncoding = recordType.encoding
 
         return try self.withNameEncoding(newEncoding: encoding.toNameEncoding()) { encoder in
-            try record.rData.write(encoder: &encoder)
+            try record.rDataErased.write(encoder: &encoder)
         }
     }
 
