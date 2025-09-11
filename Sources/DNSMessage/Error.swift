@@ -118,6 +118,14 @@ public struct DNSMessageError: Error, Equatable, Hashable, Sendable {
     public static func rDataTooLarge(totalSize: Int, maxSize: Int) -> DNSMessageError {
         Self.init(backing: .rDataTooLarge(totalSize: totalSize, maxSize: maxSize))
     }
+
+    /// A required collection cannot be empty.
+    /// - Parameter collectionName: The name of the collection that cannot be empty.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func emptyRequiredCollection(_ collectionName: String) -> DNSMessageError {
+        Self.init(backing: .emptyRequiredCollection(collectionName))
+    }
 }
 
 extension DNSMessageError: CustomStringConvertible {
@@ -127,8 +135,6 @@ extension DNSMessageError: CustomStringConvertible {
 }
 
 extension DNSMessageError {
-    enum Backing: Equatable, Hashable, Sendable {
-        case labelNotAsciiEncoded(String)
     enum Backing: Equatable, Hashable, Sendable, CustomStringConvertible {
         case stringNotAsciiEncoded(String)
         case emptyLabel
@@ -143,6 +149,7 @@ extension DNSMessageError {
         case invalidResourceRecordType(DNSResourceType)
         case characterStringTooLong(Int)
         case rDataTooLarge(totalSize: Int, maxSize: Int)
+        case emptyRequiredCollection(String)
 
         var description: String {
             switch self {
@@ -172,6 +179,8 @@ extension DNSMessageError {
                 return "Character string too long: \(length) bytes (max 255)"
             case .rDataTooLarge(let totalSize, let maxSize):
                 return "RData too large: \(totalSize) bytes (max \(maxSize))"
+            case .emptyRequiredCollection(let field):
+                return "Required collection \(field) cannot be empty"
             }
         }
     }

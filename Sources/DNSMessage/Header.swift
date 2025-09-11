@@ -23,7 +23,7 @@
 /// ```
 /// - Note: `AD` and `CD` flags are defined in [RFC4035](https://datatracker.ietf.org/doc/html/rfc4035).
 ///         The other fields are defined in [RFC1035](https://datatracker.ietf.org/doc/html/rfc1035).
-public struct DNSHeader: Sendable {
+public struct DNSHeader: Sendable, Equatable {
     public var id: UInt16
     public var flags: DNSHeaderFlags
     public var opcode: DNSOpcode
@@ -64,6 +64,10 @@ public struct DNSHeader: Sendable {
         self.answerCount = answerCount
         self.authorityCount = authorityCount
         self.additionalDataCount = additionalDataCount
+    }
+
+    public static func == (lhs: DNSHeader, rhs: DNSHeader) -> Bool {
+        lhs.id == rhs.id && lhs.flags == rhs.flags && lhs.opcode == rhs.opcode && lhs.responseCode == rhs.responseCode
     }
 }
 

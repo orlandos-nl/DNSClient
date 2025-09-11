@@ -1,4 +1,4 @@
-import NIOCore
+public import NIOCore
 
 public struct DNSDecoder {
     public var buffer: ByteBuffer
