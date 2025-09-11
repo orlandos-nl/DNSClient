@@ -40,31 +40,6 @@ final class DNSUDPClientTests: XCTestCase {
         #endif
     }
 
-    func testStringAddress() throws {
-        var buffer = ByteBuffer()
-        buffer.writeInteger(0x7F00_0001 as UInt32)
-        guard let record = ARecord.read(from: &buffer, length: buffer.readableBytes) else {
-            XCTFail()
-            return
-        }
-
-        XCTAssertEqual(record.stringAddress, "127.0.0.1")
-    }
-
-    func testStringAddressAAAA() throws {
-        var buffer = ByteBuffer()
-        buffer.writeBytes(
-            [0x2a, 0x00, 0x14, 0x50, 0x40, 0x01, 0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x0e] as [UInt8]
-        )
-
-        guard let record = AAAARecord.read(from: &buffer, length: buffer.readableBytes) else {
-            XCTFail()
-            return
-        }
-
-        XCTAssertEqual(record.stringAddress, "2a00:1450:4001:0809:0000:0000:0000:200e")
-    }
-
     func testAQuery() throws {
         try testClient { dnsClient in
             let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
@@ -82,7 +57,7 @@ final class DNSUDPClientTests: XCTestCase {
     func testSendTxtQuery() throws {
         try testClient { dnsClient in
             let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
-            XCTAssertEqual(result.header.answerCount, 0, "The returned answers should be 0 on UDP")
+            XCTAssertEqual(result.answers.count, 0, "The returned answers should be 0 on UDP")
         }
     }
 
@@ -90,7 +65,7 @@ final class DNSUDPClientTests: XCTestCase {
         try testClient { dnsClient in
             let result = try dnsClient.sendQuery(forHost: "gmail.com", type: .mx).wait()
             XCTAssertGreaterThanOrEqual(
-                result.header.answerCount,
+                result.answers.count,
                 1,
                 "The returned answers should be greater than or equal to 1"
             )
@@ -99,9 +74,9 @@ final class DNSUDPClientTests: XCTestCase {
 
     func testSendQueryCNAME() throws {
         try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "www.youtube.com", type: .cName).wait()
+            let result = try dnsClient.sendQuery(forHost: "www.youtube.com", type: .cname).wait()
             XCTAssertGreaterThanOrEqual(
-                result.header.answerCount,
+                result.answers.count,
                 1,
                 "The returned answers should be greater than or equal to 1"
             )
@@ -119,7 +94,7 @@ final class DNSUDPClientTests: XCTestCase {
         try testClient { dnsClient in
             let results = try dnsClient.initiateNSQuery(forDomain: "example.com").wait()
             XCTAssertEqual(results.count, 2)
-            let names = results.map { $0.resource.labels.string }.sorted()
+            let names = results.map { $0.rData.nsdname.description }.sorted()
             XCTAssertEqual(names, ["a.iana-servers.net", "b.iana-servers.net"])
         }
     }
@@ -127,8 +102,9 @@ final class DNSUDPClientTests: XCTestCase {
     func testSOAQuery() throws {
         try testClient { dnsClient in
             let results = try dnsClient.initiateSOAQuery(forDomain: "example.com").wait()
+            print(results)
             XCTAssertEqual(results.count, 1)
-            XCTAssertEqual(results.first?.resource.mname.string, "ns.icann.org")
+            XCTAssertEqual(results.first?.rData.mname.description, "ns.icann.org")
         }
     }
 
@@ -215,15 +191,5 @@ final class DNSUDPClientTests: XCTestCase {
             )
             #endif
         }
-    }
-
-    func testPTRRecordDescription() throws {
-        let domainname = PTRRecord(domainName: [
-            DNSLabel(stringLiteral: "dns"),
-            DNSLabel(stringLiteral: "google"),
-            DNSLabel(stringLiteral: ""),
-        ])
-
-        XCTAssertEqual(domainname.description, "PTRRecord: dns.google")
     }
 }
