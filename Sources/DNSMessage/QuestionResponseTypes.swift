@@ -1,9 +1,11 @@
+import NIOConcurrencyHelpers
+
 /// The type of resource record. This is used to determine the format of the record.
 ///
 /// The official standard list of all Resource Record (RR) Types. [IANA](https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4)
 public struct DNSResourceType: Equatable, Hashable, Sendable {
     public var rawValue: UInt16
-    private static var registeredTypes: [Self: any DNSResourceData.Type] = [
+    private static let registry: NIOLockedValueBox<[Self: any DNSResourceData.Type]> = .init([
         .a: ARecord.self,
         .ns: NSRecord.self,
         .cname: CNAMERecord.self,
@@ -18,7 +20,7 @@ public struct DNSResourceType: Equatable, Hashable, Sendable {
         // .OPT: OPTRecord.self,
         .svcb: SVCBRecord.self,
         .https: HTTPSRecord.self,
-    ]
+    ])
 
     public static var a: DNSResourceType { Self(rawValue: 1) }
     public static var ns: DNSResourceType { Self(rawValue: 2) }
@@ -44,24 +46,33 @@ public struct DNSResourceType: Equatable, Hashable, Sendable {
 
     // Register a custom RecordData (returns false if type already exists)
     public static func register<T: DNSResourceData>(_ type: T.Type) -> Bool {
-        if registeredTypes[T.resourceType] != nil {
-            return false
+        self.registry.withLockedValue { types in
+            if types[T.resourceType] != nil {
+                return false
+            }
+
+            types[T.resourceType] = type
+            return true
         }
-        registeredTypes[T.resourceType] = type
-        return true
     }
 
     // Override an existing RecordData type
     public static func override<T: DNSResourceData>(_ type: T.Type) {
-        registeredTypes[T.resourceType] = type
+        self.registry.withLockedValue { types in
+            types[T.resourceType] = type
+        }
     }
 
-    package static func registeredType(for type: DNSResourceType) -> any DNSResourceData.Type {
-        registeredTypes[type] ?? NULLRecord.self
+    public static func registeredType(for type: DNSResourceType) -> any DNSResourceData.Type {
+        self.registry.withLockedValue { types in
+            types[type] ?? NULLRecord.self
+        }
     }
 
     public static func getTypeName(for type: DNSResourceType) -> String {
-        registeredTypes[type]?.name ?? "TYPE(\(type.rawValue))"
+        self.registry.withLockedValue { types in
+            types[type]?.name ?? "TYPE(\(type.rawValue))"
+        }
     }
 
     internal var isValidInRR: Bool {

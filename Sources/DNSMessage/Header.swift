@@ -54,7 +54,7 @@ public struct DNSHeader: Sendable, Equatable {
         questionCount: UInt16,
         answerCount: UInt16,
         authorityCount: UInt16,
-        additionalDataCount: UInt16,
+        additionalDataCount: UInt16
     ) {
         self.id = id
         self.flags = flags

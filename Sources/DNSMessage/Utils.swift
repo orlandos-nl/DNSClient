@@ -25,9 +25,15 @@ extension SocketAddress {
         // Try IPv6 (16 bytes)
         if ipBytes.count == 16 {
             var addr = in6_addr()
+            #if os(Linux)
+            withUnsafeMutableBytes(of: &addr.__in6_u.__u6_addr8) { ptr in
+                ptr.copyBytes(from: ipBytes)
+            }
+            #else
             withUnsafeMutableBytes(of: &addr.__u6_addr.__u6_addr8) { ptr in
                 ptr.copyBytes(from: ipBytes)
             }
+            #endif
             var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
             let result = inet_ntop(AF_INET6, &addr, &buffer, socklen_t(INET6_ADDRSTRLEN))!
             let ipString = String(cString: result)

@@ -20,7 +20,7 @@ public struct SVCUnknown: SVCParamValue {
     }
 
     /// Uses UInt16.max as a placeholder key value since this represents any unknown parameter
-    public static var correspondingKey: SVCParamKey { .other(UInt16.max) }
+    public static var correspondingKey: SVCParamKey { .init(rawValue: UInt16.max) }
     public static var name: String { "unknown" }
 
     public init(bytes: [UInt8]) {

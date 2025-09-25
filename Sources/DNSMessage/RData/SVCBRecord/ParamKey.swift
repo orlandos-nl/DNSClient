@@ -1,3 +1,5 @@
+import NIOConcurrencyHelpers
+
 ///  [RFC 9460 SVCB and HTTPS Resource Records, Nov 2023](https://datatracker.ietf.org/doc/html/rfc9460#section-14.3.2)
 ///
 /// ```text
@@ -54,7 +56,7 @@
 public struct SVCParamKey: Equatable, Hashable, Sendable {
     public let rawValue: UInt16
 
-    private static var registeredParams: [Self: any SVCParamValue.Type] = [
+    private static let registry: NIOLockedValueBox<[Self: any SVCParamValue.Type]> = .init([
         .mandatory: SVCMandatory.self,
         .alpn: SVCALPN.self,
         .noDefaultAlpn: SVCNoDefaultALPN.self,
@@ -62,11 +64,7 @@ public struct SVCParamKey: Equatable, Hashable, Sendable {
         .ipv4Hint: SVCIPv4Hint.self,
         .ipv6Hint: SVCIPv6Hint.self,
         .ohttp: SVCObliviousHTTP.self,
-    ]
-
-    public static func getKeyName(for key: Self) -> String {
-        registeredParams[key]?.name ?? "key(\(key.rawValue))"
-    }
+    ])
 
     public static var mandatory: SVCParamKey { Self(rawValue: 0) }
     public static var alpn: SVCParamKey { Self(rawValue: 1) }
@@ -76,23 +74,36 @@ public struct SVCParamKey: Equatable, Hashable, Sendable {
     public static var ipv6Hint: SVCParamKey { Self(rawValue: 6) }
     public static var ohttp: SVCParamKey { Self(rawValue: 8) }
 
-    public static func other(_ rawValue: UInt16) -> Self {
-        Self(rawValue: rawValue)
+    public init(rawValue: UInt16) {
+        self.rawValue = rawValue
     }
 
     public static func register<T: SVCParamValue>(_ type: T.Type) -> Bool {
-        if registeredParams[T.correspondingKey] != nil {
-            return false
+        self.registry.withLockedValue { params in
+            if params[T.correspondingKey] != nil {
+                return false
+            }
+
+            params[T.correspondingKey] = type
+            return true
         }
-        registeredParams[T.correspondingKey] = type
-        return true
     }
 
     public static func override<T: SVCParamValue>(_ type: T.Type) {
-        registeredParams[T.correspondingKey] = type
+        self.registry.withLockedValue { params in
+            params[T.correspondingKey] = type
+        }
     }
 
     public static func registeredParam(for key: Self) -> any SVCParamValue.Type {
-        registeredParams[key] ?? SVCUnknown.self
+        self.registry.withLockedValue { params in
+            params[key] ?? SVCUnknown.self
+        }
+    }
+
+    public static func getKeyName(for key: Self) -> String {
+        self.registry.withLockedValue { params in
+            params[key]?.name ?? "key(\(key.rawValue))"
+        }
     }
 }

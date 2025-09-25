@@ -61,7 +61,11 @@ public struct AAAARecord: DNSResourceData {
             )
         }
 
-        let bytes = withUnsafeBytes(of: addr.__u6_addr) { Array($0) }
+        #if os(Linux)
+        let bytes = withUnsafeBytes(of: addr.__in6_u.__u6_addr8) { Array($0) }
+        #else
+        let bytes = withUnsafeBytes(of: addr.__u6_addr.__u6_addr8) { Array($0) }
+        #endif
 
         self.ipv6Address = bytes
         self._socketAddress = try SocketAddress(ipBytes: bytes, port: 0)

@@ -165,7 +165,7 @@ public struct SVCBRecord: DNSResourceData {
             }
 
             lastKeyValue = Int(paramKeyRaw)
-            let paramKey = SVCParamKey.other(paramKeyRaw)
+            let paramKey = SVCParamKey(rawValue: paramKeyRaw)
             let paramValueType = SVCParamKey.registeredParam(for: paramKey)
             let paramValue = try paramValueType.init(from: &decoder, length: Int(paramLength))
 

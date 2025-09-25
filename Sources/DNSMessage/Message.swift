@@ -39,14 +39,14 @@
 /// ```
 public struct DNSMessage: Sendable {
     public var header: DNSHeader
-    public var questions: [DNSQuestion]
+    public var questions: [any DNSQuestionProtocol]
     public var answers: [any DNSRecordProtocol]
     public var authorities: [any DNSRecordProtocol]
     public var additionalData: [any DNSRecordProtocol]
 
     public init(
         header: DNSHeader,
-        questions: [DNSQuestion] = [],
+        questions: [any DNSQuestionProtocol] = [],
         answers: [any DNSRecordProtocol] = [],
         authorities: [any DNSRecordProtocol] = [],
         additionalData: [any DNSRecordProtocol] = []
@@ -59,7 +59,7 @@ public struct DNSMessage: Sendable {
     }
 
     public func isEqual(_ other: DNSMessage) -> Bool {
-        header == other.header && questions == other.questions
+        header == other.header && questions.elementsEqual(other.questions, by: { $0.isEqual($1) })
             && answers.elementsEqual(other.answers, by: { $0.isEqual($1) })
             && authorities.elementsEqual(other.authorities, by: { $0.isEqual($1) })
             && additionalData.elementsEqual(other.additionalData, by: { $0.isEqual($1) })
@@ -98,3 +98,46 @@ extension DNSMessage {
 
 @available(*, deprecated, renamed: "DNSMessage")
 public typealias Message = DNSMessage
+
+public struct DNSClientMessage: Sendable {
+    public var opcode: DNSOpcode
+    public var recursionDesired: Bool
+    public var queries: [any DNSQuestionProtocol]
+
+    public init(opcode: DNSOpcode = .query, recursionDesired: Bool = true, queries: [any DNSQuestionProtocol] = []) {
+        self.opcode = opcode
+        self.recursionDesired = recursionDesired
+        self.queries = queries
+    }
+
+    package func toInternalRepresentation() throws -> DNSMessage {
+        var flags: DNSHeaderFlags = []
+        if self.recursionDesired {
+            flags.insert(.recursionDesired)
+        }
+
+        // Convert EDNS to OPTRecord and place in additionalData
+        // var additionalData: [DNSRecord] = []
+
+        // if let edns = self.edns {
+        //     additionalData.append(try edns.toInternalRepresentation())
+        // }
+
+        let header = DNSHeader(
+            id: UInt16.random(in: 0...UInt16.max),
+            flags: flags,
+            opcode: self.opcode,
+            responseCode: .noError
+        )
+
+        return DNSMessage(
+            header: header,
+            questions: self.queries,
+            answers: [],
+            authorities: [],
+            // additionalData: additionalData,
+            additionalData: []
+            // edns: self.edns
+        )
+    }
+}

@@ -217,8 +217,9 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeDNSQuestion(_ question: DNSQuestion) throws -> Int {
+    private mutating func writeDNSQuestion(_ questionProtocol: any DNSQuestionProtocol) throws -> Int {
         var written = 0
+        let question = try questionProtocol.toInternalRepresentation()
 
         written += try self.writeDNSName(question.name)
         written += self.buffer.writeInteger(question.type.rawValue)
@@ -249,7 +250,7 @@ public struct DNSEncoder {
         let encoding: DNSRDataEncoding = recordType.encoding
 
         return try self.withNameEncoding(newEncoding: encoding.toNameEncoding()) { encoder in
-            try record.rDataErased.write(encoder: &encoder)
+            try record.rDataTypeErased.write(encoder: &encoder)
         }
     }
 
