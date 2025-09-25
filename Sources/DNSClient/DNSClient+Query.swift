@@ -37,7 +37,7 @@ extension DNSClient {
         self.inboundHandler.messageCache.withLockedValue { cache in
             for (id, query) in cache {
                 cache[id] = nil
-                query.promise.fail(CancelError())
+                query.promise.fail(DNSClientError.cancelError())
             }
         }
     }
@@ -183,6 +183,21 @@ extension DNSClient {
                 $0.asResourceRecord(SOARecord.self)
             }
         }
+    }
+}
+
+extension DNSClient: DNSClientProtocol {
+    public func send(_ message: DNSMessage, timeout: TimeAmount) async throws -> DNSMessage {
+        let messageID = self.messageID.withLockedValue { id in
+            let newID = id &+ 1
+            id = newID
+            return id
+        }
+
+        var message = message
+        message.header.id = messageID
+
+        return try await self.send(message).get()
     }
 }
 

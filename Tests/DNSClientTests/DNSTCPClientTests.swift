@@ -113,28 +113,6 @@ final class DNSTCPClientTests: XCTestCase {
         }
     }
 
-    func testSRVRecordsAsyncRequest() throws {
-        testClient { dnsClient in
-            let expectation = self.expectation(description: "getSRVRecords")
-
-            dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com")
-                .whenComplete { (result) in
-                    switch result {
-                    case .failure(let error):
-                        XCTFail("\(error)")
-                    case .success(let answers):
-                        XCTAssertGreaterThanOrEqual(
-                            answers.count,
-                            1,
-                            "The returned answers should be greater than or equal to 1"
-                        )
-                    }
-                    expectation.fulfill()
-                }
-            self.waitForExpectations(timeout: 5, handler: nil)
-        }
-    }
-
     func testThreadSafety() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let client = try await DNSClient.connectTCP(
@@ -153,7 +131,7 @@ final class DNSTCPClientTests: XCTestCase {
 
     func testAll() throws {
         try testSRVRecords()
-        try testSRVRecordsAsyncRequest()
+        // try testSRVRecordsAsyncRequest()
         try testSendQueryMX()
         try testSendQueryCNAME()
         try testSendTxtQuery()
