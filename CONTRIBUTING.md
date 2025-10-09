@@ -29,7 +29,7 @@ The keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SH
 We enforce a strong **Separation of Concerns** to keep the library clean and maintainable.
 
 *   **Data Models MUST Be Pure:** Structs representing DNS data (like `ARecord` or `AAAARecord`) **MUST** be simple, plain-data types that are a 1-to-1 mapping of the data defined in the RFC.
-*   **Do Not Mix Layers:** Do not couple data models with higher-level networking abstractions. For example, an `ARecord` model **MUST** contain only the 32-bit address; it **MUST NOT** contain a `SocketAddress`, which is a higher-level type used for establishing connections. The creation of networking types from data models is the responsibility of the code that *uses* the library, not the library's data models themselves.
+*   **Do Not Mix Layers:** Do not couple data models with abstractions. We create our own record types, and translate to different currency types of the ecosystem if the need exists.
 
 ### 3. API Design and Naming Conventions
 
