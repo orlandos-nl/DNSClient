@@ -1,6 +1,10 @@
 import Foundation
 import NIO
 
+#if os(Linux)
+import CNIOLinux
+#endif
+
 /// Extension to SocketAddress to support creation from byte arrays
 extension SocketAddress {
     /// Creates a SocketAddress from IP address bytes, trying IPv4 first then IPv6

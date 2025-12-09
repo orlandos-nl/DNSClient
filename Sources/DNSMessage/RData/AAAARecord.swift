@@ -1,6 +1,10 @@
 import NIO
 public import NIOCore
 
+#if os(Linux)
+import CNIOLinux
+#endif
+
 /// [RFC 3596, DNS Extensions to Support IP Version 6, October 2003](https://tools.ietf.org/html/rfc3596)
 ///
 /// 2.1 AAAA record type
@@ -16,11 +20,22 @@ public import NIOCore
 ///
 /// ADDRESS         A 128 bit IPv6 address.
 public struct AAAARecord: DNSResourceData {
-    public let ipv6Address: [UInt8]
-    private let _socketAddress: SocketAddress
+    public let bytes: [UInt8]
 
     public var description: String {
-        "\(_socketAddress.ipAddress ?? "<invalid IPv6>")"
+        var addr = in6_addr()
+        #if os(Linux)
+        withUnsafeMutableBytes(of: &addr.__in6_u.__u6_addr8) { ptr in
+            ptr.copyBytes(from: self.bytes)
+        }
+        #else
+        withUnsafeMutableBytes(of: &addr.__u6_addr.__u6_addr8) { ptr in
+            ptr.copyBytes(from: self.bytes)
+        }
+        #endif
+        var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+        let result = inet_ntop(AF_INET6, &addr, &buffer, socklen_t(INET6_ADDRSTRLEN))!
+        return String(cString: result)
     }
 
     public static var name: String { "AAAA" }
@@ -28,7 +43,7 @@ public struct AAAARecord: DNSResourceData {
     public static var resourceType: DNSResourceType { .aaaa }
 
     public static func == (lhs: AAAARecord, rhs: AAAARecord) -> Bool {
-        lhs.ipv6Address == rhs.ipv6Address
+        lhs.bytes == rhs.bytes
     }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
@@ -40,12 +55,11 @@ public struct AAAARecord: DNSResourceData {
             throw DNSMessageError.insufficientData(expected: 16, available: decoder.buffer.readableBytes)
         }
 
-        self.init(ipv6Address: address, socketAddress: try SocketAddress(ipBytes: address, port: 0))
+        self.init(bytes: address)
     }
 
-    private init(ipv6Address: [UInt8], socketAddress: SocketAddress) {
-        self.ipv6Address = ipv6Address
-        self._socketAddress = socketAddress
+    private init(bytes: [UInt8]) {
+        self.bytes = bytes
     }
 
     public init(address: String) throws {
@@ -67,11 +81,10 @@ public struct AAAARecord: DNSResourceData {
         let bytes = withUnsafeBytes(of: addr.__u6_addr.__u6_addr8) { Array($0) }
         #endif
 
-        self.ipv6Address = bytes
-        self._socketAddress = try SocketAddress(ipBytes: bytes, port: 0)
+        self.bytes = bytes
     }
 
-    public init(address: [UInt8]) throws {
+    public init(address: some Collection<UInt8>) throws {
         guard address.count == 16 else {
             throw DNSMessageError.invalidFormat(
                 field: "IPv6 address bytes",
@@ -79,21 +92,15 @@ public struct AAAARecord: DNSResourceData {
             )
         }
 
-        self.ipv6Address = address
-        self._socketAddress = try SocketAddress(ipBytes: address, port: 0)
+        self.bytes = Array(address)
     }
 
     public func write(encoder: inout DNSEncoder) throws -> Int {
-        encoder.buffer.writeBytes(self.ipv6Address)
+        encoder.buffer.writeBytes(self.bytes)
     }
 
     /// Converts the IPv6 address to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
     public func socketAddress(port: Int) throws -> SocketAddress {
-        try SocketAddress(ipAddress: _socketAddress.ipAddress!, port: port)
-    }
-
-    /// Check if this is a multicast address
-    public var isMulticast: Bool {
-        _socketAddress.isMulticast
+        try SocketAddress(ipBytes: self.bytes, port: port)
     }
 }

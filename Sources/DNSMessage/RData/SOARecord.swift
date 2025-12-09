@@ -58,9 +58,9 @@ public struct SOARecord: DNSResourceData {
     // a database that contains all of the DNS records for a domain.
     public var serialNumber: UInt32
 
-    public var refreshInterval: Int32
-    public var retryInterval: Int32
-    public var expireInterval: Int32
+    public var refreshInterval: UInt32
+    public var retryInterval: UInt32
+    public var expireInterval: UInt32
     public var minimumTTL: UInt32
 
     public var description: String {
@@ -75,9 +75,9 @@ public struct SOARecord: DNSResourceData {
         mname: DNSName,
         rname: DNSName,
         serialNumber: UInt32,
-        refreshInterval: Int32,
-        retryInterval: Int32,
-        expireInterval: Int32,
+        refreshInterval: UInt32,
+        retryInterval: UInt32,
+        expireInterval: UInt32,
         minimumTTL: UInt32
     ) {
         self.mname = mname
@@ -96,9 +96,9 @@ public struct SOARecord: DNSResourceData {
         try decoder.readDNSName(name: &self.rname)
         guard
             let serialNumber: UInt32 = decoder.buffer.readInteger(),
-            let refreshInterval: Int32 = decoder.buffer.readInteger(),
-            let retryInterval: Int32 = decoder.buffer.readInteger(),
-            let expireInterval: Int32 = decoder.buffer.readInteger(),
+            let refreshInterval: UInt32 = decoder.buffer.readInteger(),
+            let retryInterval: UInt32 = decoder.buffer.readInteger(),
+            let expireInterval: UInt32 = decoder.buffer.readInteger(),
             let minimumInterval: UInt32 = decoder.buffer.readInteger()
         else {
             throw DNSMessageError.insufficientData(expected: 20, available: decoder.buffer.readableBytes)

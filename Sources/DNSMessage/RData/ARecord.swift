@@ -1,6 +1,10 @@
 import NIO
 public import NIOCore
 
+#if os(Linux)
+import CNIOLinux
+#endif
+
 /// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987](https://tools.ietf.org/html/rfc1035)
 ///
 /// 3.4.1. A RDATA format
@@ -13,11 +17,16 @@ public import NIOCore
 ///
 /// ADDRESS         A 32 bit Internet address.
 public struct ARecord: DNSResourceData {
-    public let ipv4Address: [UInt8]
-    private let _socketAddress: SocketAddress
+    public let bytes: [UInt8]
 
     public var description: String {
-        "\(_socketAddress.ipAddress ?? "<invalid IPv4>")"
+        var addr = in_addr()
+        withUnsafeMutableBytes(of: &addr.s_addr) { ptr in
+            ptr.copyBytes(from: self.bytes)
+        }
+        var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        let result = inet_ntop(AF_INET, &addr, &buffer, socklen_t(INET_ADDRSTRLEN))!
+        return String(cString: result)
     }
 
     public static var name: String { "A" }
@@ -25,7 +34,7 @@ public struct ARecord: DNSResourceData {
     public static var resourceType: DNSResourceType { .a }
 
     public static func == (lhs: ARecord, rhs: ARecord) -> Bool {
-        lhs.ipv4Address == rhs.ipv4Address
+        lhs.bytes == rhs.bytes
     }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
@@ -37,12 +46,11 @@ public struct ARecord: DNSResourceData {
             throw DNSMessageError.insufficientData(expected: 4, available: decoder.buffer.readableBytes)
         }
 
-        self.init(ipv4Address: address, socketAddress: try SocketAddress(ipBytes: address, port: 0))
+        self.init(ipv4Address: address)
     }
 
-    private init(ipv4Address: [UInt8], socketAddress: SocketAddress) {
-        self.ipv4Address = ipv4Address
-        self._socketAddress = socketAddress
+    private init(ipv4Address: [UInt8]) {
+        self.bytes = ipv4Address
     }
 
     public init(address: String) throws {
@@ -60,11 +68,10 @@ public struct ARecord: DNSResourceData {
 
         let bytes = withUnsafeBytes(of: addr.s_addr) { Array($0) }
 
-        self.ipv4Address = bytes
-        self._socketAddress = try SocketAddress(ipBytes: bytes, port: 0)
+        self.bytes = bytes
     }
 
-    public init(address: [UInt8]) throws {
+    public init(address: some Collection<UInt8>) throws {
         guard address.count == 4 else {
             throw DNSMessageError.invalidFormat(
                 field: "IPv4 address bytes",
@@ -72,21 +79,15 @@ public struct ARecord: DNSResourceData {
             )
         }
 
-        self.ipv4Address = address
-        self._socketAddress = try SocketAddress(ipBytes: address, port: 0)
+        self.bytes = Array(address)
     }
 
     public func write(encoder: inout DNSEncoder) throws -> Int {
-        encoder.buffer.writeBytes(self.ipv4Address)
+        encoder.buffer.writeBytes(self.bytes)
     }
 
     /// Converts the IPv4 address to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
     public func socketAddress(port: Int) throws -> SocketAddress {
-        try SocketAddress(ipAddress: _socketAddress.ipAddress!, port: port)
-    }
-
-    /// Check if this is a multicast address
-    public var isMulticast: Bool {
-        self._socketAddress.isMulticast
+        try SocketAddress(ipBytes: self.bytes, port: port)
     }
 }

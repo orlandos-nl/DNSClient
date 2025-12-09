@@ -37,32 +37,25 @@
 /// which relate to the query, but are not strictly answers for the
 /// question.
 /// ```
-public struct DNSMessage: Sendable {
+public struct DNSMessage: Sendable, Equatable {
     public var header: DNSHeader
-    public var questions: [any DNSQuestionProtocol]
-    public var answers: [any DNSRecordProtocol]
-    public var authorities: [any DNSRecordProtocol]
-    public var additionalData: [any DNSRecordProtocol]
+    public var questions: [DNSQuestion]
+    public var answers: [DNSRecord]
+    public var authorities: [DNSRecord]
+    public var additionalData: [DNSRecord]
 
     public init(
         header: DNSHeader,
-        questions: [any DNSQuestionProtocol] = [],
-        answers: [any DNSRecordProtocol] = [],
-        authorities: [any DNSRecordProtocol] = [],
-        additionalData: [any DNSRecordProtocol] = []
+        questions: [DNSQuestion] = [],
+        answers: [DNSRecord] = [],
+        authorities: [DNSRecord] = [],
+        additionalData: [DNSRecord] = []
     ) {
         self.header = header
         self.questions = questions
         self.answers = answers
         self.authorities = authorities
         self.additionalData = additionalData
-    }
-
-    public func isEqual(_ other: DNSMessage) -> Bool {
-        header == other.header && questions.elementsEqual(other.questions, by: { $0.isEqual($1) })
-            && answers.elementsEqual(other.answers, by: { $0.isEqual($1) })
-            && authorities.elementsEqual(other.authorities, by: { $0.isEqual($1) })
-            && additionalData.elementsEqual(other.additionalData, by: { $0.isEqual($1) })
     }
 }
 
@@ -102,9 +95,9 @@ public typealias Message = DNSMessage
 public struct DNSClientMessage: Sendable {
     public var opcode: DNSOpcode
     public var recursionDesired: Bool
-    public var queries: [any DNSQuestionProtocol]
+    public var queries: [any DNSQueryProtocol]
 
-    public init(opcode: DNSOpcode = .query, recursionDesired: Bool = true, queries: [any DNSQuestionProtocol] = []) {
+    public init(opcode: DNSOpcode = .query, recursionDesired: Bool = true, queries: [any DNSQueryProtocol] = []) {
         self.opcode = opcode
         self.recursionDesired = recursionDesired
         self.queries = queries
@@ -130,9 +123,11 @@ public struct DNSClientMessage: Sendable {
             responseCode: .noError
         )
 
+        let questions = try self.queries.map({try $0.toInternalRepresentation()})
+
         return DNSMessage(
             header: header,
-            questions: self.queries,
+            questions: questions,
             answers: [],
             authorities: [],
             // additionalData: additionalData,

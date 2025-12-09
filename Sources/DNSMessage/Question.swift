@@ -1,4 +1,4 @@
-public protocol DNSQuestionProtocol: Sendable, CustomStringConvertible, Hashable {
+public protocol DNSQueryProtocol: Sendable, CustomStringConvertible, Hashable {
     var hostname: String { get }
     var type: DNSResourceType { get }
     var questionClass: DNSClass { get }
@@ -6,19 +6,9 @@ public protocol DNSQuestionProtocol: Sendable, CustomStringConvertible, Hashable
     func toInternalRepresentation() throws -> DNSQuestion
 }
 
-extension DNSQuestionProtocol {
+extension DNSQueryProtocol {
     public var description: String {
         "\(self.hostname) \(DNSResourceType.getTypeName(for: self.type)) \(self.questionClass)"
-    }
-
-    public func isEqual(_ other: any DNSQuestionProtocol) -> Bool {
-        do {
-            let selfInternal = try self.toInternalRepresentation()
-            let otherInternal = try other.toInternalRepresentation()
-            return selfInternal == otherInternal
-        } catch {
-            return false
-        }
     }
 }
 
@@ -36,13 +26,17 @@ extension DNSQuestionProtocol {
 ///     |                     QCLASS                    |
 ///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 /// ```
-public struct DNSQuestion: DNSQuestionProtocol, Equatable, Sendable {
+public struct DNSQuestion: Equatable, Sendable, CustomStringConvertible {
     public var name: DNSName
     public var type: DNSResourceType
     public var questionClass: DNSClass
 
     public var hostname: String {
         self.name.description
+    }
+
+    public var description: String {
+        "\(self.name) \(DNSResourceType.getTypeName(for: self.type)) \(self.questionClass)"
     }
 
     public init(name: DNSName, type: DNSResourceType, questionClass: DNSClass) throws {
@@ -54,13 +48,9 @@ public struct DNSQuestion: DNSQuestionProtocol, Equatable, Sendable {
         self.type = type
         self.questionClass = questionClass
     }
-
-    public func toInternalRepresentation() throws -> DNSQuestion {
-        self
-    }
 }
 
-public struct DNSQuery<RData: DNSResourceData>: DNSQuestionProtocol, Equatable, Sendable {
+public struct DNSQuery<RData: DNSResourceData>: DNSQueryProtocol, Equatable, Sendable {
     public var hostname: String
     public var type: DNSResourceType { RData.resourceType }
     public var questionClass: DNSClass

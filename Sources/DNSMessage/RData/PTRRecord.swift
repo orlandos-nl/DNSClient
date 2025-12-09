@@ -19,26 +19,26 @@ import NIOCore
 /// similar to that performed by CNAME, which identifies aliases.  See the
 /// description of the IN-ADDR.ARPA domain for an example.
 public struct PTRRecord: DNSResourceData {
-    public var ptrdname: DNSName
+    public var targetDomainName: DNSName
 
     public var description: String {
-        "\(String(describing: ptrdname))"
+        "\(String(describing: targetDomainName))"
     }
 
     public static var name: String { "PTR" }
     public static var encoding: DNSRDataEncoding { .standardRecord }
     public static var resourceType: DNSResourceType { .ptr }
 
-    public init(ptrdname: DNSName) {
-        self.ptrdname = ptrdname
+    public init(targetDomainName: DNSName) {
+        self.targetDomainName = targetDomainName
     }
 
     public init(from decoder: inout DNSDecoder, length: Int) throws {
-        self.ptrdname = DNSName()
-        try decoder.readDNSName(name: &self.ptrdname)
+        self.targetDomainName = DNSName()
+        try decoder.readDNSName(name: &self.targetDomainName)
     }
 
     public func write(encoder: inout DNSEncoder) throws -> Int {
-        try encoder.writeDNSName(self.ptrdname)
+        try encoder.writeDNSName(self.targetDomainName)
     }
 }

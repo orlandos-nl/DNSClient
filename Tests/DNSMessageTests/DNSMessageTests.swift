@@ -39,7 +39,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
+        XCTAssertTrue(decodedMessage == originalMessage)
     }
 
     func testARecordRoundTrip() throws {
@@ -113,7 +113,7 @@ final class DNSMessageTests: XCTestCase {
     }
 
     func testPTRRecordRoundTrip() throws {
-        let originalRecord = PTRRecord(ptrdname: try DNSName(from: "example.com"))
+        let originalRecord = PTRRecord(targetDomainName: try DNSName(from: "example.com"))
 
         var encoder = DNSEncoder()
         _ = try originalRecord.write(encoder: &encoder)
@@ -293,7 +293,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
+        XCTAssertTrue(decodedMessage == originalMessage)
     }
 
     func testDNSNameCompression() throws {
@@ -321,8 +321,8 @@ final class DNSMessageTests: XCTestCase {
         var decoder2 = DNSDecoder(buffer: uncompressedBuffer)
         let decodedUncompressed = try decoder2.readDNSMessage()
 
-        XCTAssertTrue(decodedCompressed.isEqual(decodedUncompressed))
-        XCTAssertTrue(decodedCompressed.isEqual(message))
+        XCTAssertTrue(decodedCompressed == decodedUncompressed)
+        XCTAssertTrue(decodedCompressed == message)
     }
 
     func testMultipleRecordTypesMessage() throws {
@@ -394,7 +394,7 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
+        XCTAssertTrue(decodedMessage == originalMessage)
     }
 
     func testEmptyMessage() throws {
@@ -409,6 +409,6 @@ final class DNSMessageTests: XCTestCase {
         var decoder = DNSDecoder(buffer: buffer)
         let decodedMessage = try decoder.readDNSMessage()
 
-        XCTAssertTrue(decodedMessage.isEqual(originalMessage))
+        XCTAssertTrue(decodedMessage == originalMessage)
     }
 }

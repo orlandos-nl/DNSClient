@@ -217,9 +217,8 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeDNSQuestion(_ questionProtocol: any DNSQuestionProtocol) throws -> Int {
+    private mutating func writeDNSQuestion(_ question: DNSQuestion) throws -> Int {
         var written = 0
-        let question = try questionProtocol.toInternalRepresentation()
 
         written += try self.writeDNSName(question.name)
         written += self.buffer.writeInteger(question.type.rawValue)
@@ -228,7 +227,7 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeDNSRecord(_ record: any DNSRecordProtocol) throws -> Int {
+    private mutating func writeDNSRecord(_ record: DNSRecord) throws -> Int {
         var written = 0
 
         // Write the DNS resource record header fields (RFC 1035 Section 3.2.1)
@@ -244,7 +243,7 @@ public struct DNSEncoder {
         return written
     }
 
-    private mutating func writeRData(_ record: any DNSRecordProtocol) throws -> Int {
+    private mutating func writeRData(_ record: DNSRecord) throws -> Int {
         // Get encoding from registered type, fallback to standard if not registered
         let recordType = DNSResourceType.registeredType(for: record.rrType)
         let encoding: DNSRDataEncoding = recordType.encoding

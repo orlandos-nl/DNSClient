@@ -19,7 +19,7 @@ public protocol DNSClientProtocol: AnyObject, Sendable {
 
     // DNSQuestion
     func send(
-        _ query: any DNSQuestionProtocol,
+        _ question: DNSQuestion,
         recursionDesired: Bool,
         timeout: TimeAmount
     ) async throws -> DNSMessage
@@ -66,7 +66,7 @@ extension DNSClientProtocol {
 
     // DNSQuestion
     public func send(
-        _ question: any DNSQuestionProtocol,
+        _ question: DNSQuestion,
         recursionDesired: Bool = true,
         timeout: TimeAmount = .seconds(5)
     ) async throws -> DNSMessage {

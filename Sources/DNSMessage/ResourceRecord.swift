@@ -15,20 +15,6 @@ extension DNSRecordProtocol {
             && self.rDataTypeErased.isEqual(to: other.rDataTypeErased)
     }
 
-    public func rData<T: DNSResourceData>(as type: T.Type) -> T? {
-        self.rDataTypeErased as? T
-    }
-
-    public func asResourceRecord<T: DNSResourceData>(_ type: T.Type) -> DNSResourceRecord<T>? {
-        guard let typedData = self.rDataTypeErased as? T else { return nil }
-        return try? DNSResourceRecord(
-            name: self.name,
-            rrType: self.rrType,
-            recordClass: self.recordClass,
-            ttl: self.ttl,
-            rData: typedData
-        )
-    }
 }
 
 /// A protocol that can be used to read a DNS resource from a buffer.
@@ -127,13 +113,12 @@ public struct DNSRDataEncoding: Equatable, Hashable, Sendable {
 ///                 resource.  The format of this information varies
 ///                 according to the TYPE and CLASS of the resource record.
 /// ```
-public struct DNSResourceRecord<ResourceData: DNSResourceData>: DNSRecordProtocol {
+public struct DNSResourceRecord<ResourceData: DNSResourceData>: Sendable, Equatable, CustomStringConvertible {
     public var name: DNSName
     public var rrType: DNSResourceType
     public var recordClass: DNSClass
     public var ttl: UInt32
     public var rData: ResourceData
-    public var rDataTypeErased: any DNSResourceData { self.rData }
 
     public var description: String {
         "\(self.name) \(self.ttl) \(String(describing: self.recordClass)) \(ResourceData.name) \(String(describing: self.rData))"
@@ -158,7 +143,7 @@ public struct DNSResourceRecord<ResourceData: DNSResourceData>: DNSRecordProtoco
     }
 }
 
-public struct DNSRecord: DNSRecordProtocol, Sendable, Equatable {
+public struct DNSRecord: Sendable, Equatable, CustomStringConvertible {
     public var name: DNSName
     public var rrType: DNSResourceType
     public var recordClass: DNSClass
@@ -195,22 +180,27 @@ public struct DNSRecord: DNSRecordProtocol, Sendable, Equatable {
         self.rDataTypeErased = rData
     }
 
+    public func rData<T: DNSResourceData>(as type: T.Type) -> T? {
+        self.rDataTypeErased as? T
+    }
+
+    public func asResourceRecord<T: DNSResourceData>(_ type: T.Type) -> DNSResourceRecord<T>? {
+        guard let typedData = self.rDataTypeErased as? T else { return nil }
+        return try? DNSResourceRecord(
+            name: self.name,
+            rrType: self.rrType,
+            recordClass: self.recordClass,
+            ttl: self.ttl,
+            rData: typedData
+        )
+    }
+
     public static func == (lhs: DNSRecord, rhs: DNSRecord) -> Bool {
-        lhs.isEqual(rhs)
-    }
-
-    public static func == <ResourceData: DNSResourceData>(
-        lhs: DNSRecord,
-        rhs: DNSResourceRecord<ResourceData>
-    ) -> Bool {
-        lhs.isEqual(rhs)
-    }
-
-    public static func == <ResourceData: DNSResourceData>(
-        lhs: DNSResourceRecord<ResourceData>,
-        rhs: DNSRecord
-    ) -> Bool {
-        lhs.isEqual(rhs)
+        return lhs.name == rhs.name
+            && lhs.rrType == rhs.rrType
+            && lhs.recordClass == rhs.recordClass
+            && lhs.ttl == rhs.ttl
+            && lhs.rDataTypeErased.isEqual(to: rhs.rDataTypeErased)
     }
 }
 
