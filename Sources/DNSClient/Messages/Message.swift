@@ -456,7 +456,9 @@ extension UInt32 {
     /// Converts the UInt32 to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
     func socketAddress(port: Int) throws -> SocketAddress {
         #if os(Windows)
-        let text = inet_ntoa(in_addr(s_addr: Int32(bitPattern: self.bigEndian)))!
+        guard let text = inet_ntoa(in_addr(S_un: in_addr.__Unnamed_union_S_un(S_addr: self))) else {
+            throw SocketAddressError.unableToConvert
+        }
         #else
         let text = inet_ntoa(in_addr(s_addr: self.bigEndian))!
         #endif
@@ -466,6 +468,9 @@ extension UInt32 {
     }
 }
 
+enum SocketAddressError: Error {
+    case unableToConvert
+}
 
 extension Sequence where Element == DNSLabel {
     /// Converts a sequence of DNS labels to a string.
