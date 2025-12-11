@@ -1,6 +1,10 @@
 import NIO
 import Foundation
 
+#if os(Windows)
+import ucrt
+#endif
+
 extension DNSClient {
     /// Connect to the dns server
     ///
@@ -113,8 +117,10 @@ extension DNSClient {
         let dnsDecoder = DNSDecoder(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)
+            #if !os(Windows)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            #endif
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
                     EnvelopeInboundChannel(),
@@ -124,7 +130,7 @@ extension DNSClient {
                 )
         }
 
-		let ipv4 = address.protocol.rawValue == PF_INET
+		let ipv4 = address.protocol == .inet
 		
         return bootstrap.bind(host: ipv4 ? "0.0.0.0" : "::", port: 0).map { channel in
             let client = DNSClient(
@@ -175,7 +181,7 @@ extension DNSClient {
 
 fileprivate extension Array where Element == SocketAddress {
     var preferred: SocketAddress? {
-		return first(where: { $0.protocol.rawValue == PF_INET }) ?? first
+		return first(where: { $0.protocol == .inet }) ?? first
     }
 }
 

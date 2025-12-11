@@ -1,6 +1,11 @@
 import NIO
 import Foundation
 
+#if os(Windows)
+import ucrt
+import WinSDK
+#endif
+
 /// The header of a DNS message.
 public struct DNSMessageHeader : Sendable{
     /// The ID of the message. This is used to match responses to requests.
@@ -450,7 +455,11 @@ extension ByteBuffer: DNSResource {
 extension UInt32 {
     /// Converts the UInt32 to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
     func socketAddress(port: Int) throws -> SocketAddress {
+        #if os(Windows)
+        let text = inet_ntoa(in_addr(s_addr: Int32(bitPattern: self.bigEndian)))!
+        #else
         let text = inet_ntoa(in_addr(s_addr: self.bigEndian))!
+        #endif
         let host = String(cString: text)
         
         return try SocketAddress(ipAddress: host, port: port)

@@ -1,6 +1,11 @@
 import NIO
 import NIOConcurrencyHelpers
 
+#if os(Windows)
+import ucrt
+import WinSDK
+#endif
+
 extension DNSClient {
     /// Request A records
     ///
@@ -55,6 +60,8 @@ extension DNSClient {
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___in6_union.self).baseAddress!.pointee
                 }
                 let sockaddr = sockaddr_in6(sin6_family: sa_family_t(AF_INET6), sin6_port: in_port_t(port), sin6_flowinfo: flowinfo, sin6_addr: in6_addr(__in6_union: ipAddress), sin6_scope_id: scopeID)
+                #elseif os(Windows)
+                let sockaddr = sockaddr_in6()
                 #else
                 let ipAddress = address.withUnsafeBytes { buffer in
                     return buffer.bindMemory(to: in6_addr.__Unnamed_union___u6_addr.self).baseAddress!.pointee

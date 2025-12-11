@@ -1,4 +1,8 @@
 import NIO
+#if os(Windows)
+import ucrt
+import WinSDK
+#endif
 
 /// A DNS PTR record. This is used for address to name mapping.
 public struct PTRRecord: DNSResource {
@@ -78,6 +82,9 @@ extension DNSClient {
             let error = IOError(errnoCode: EINVAL, reason: #function)
             return self.loop.makeFailedFuture(error)
         } else if retval == -1 {
+            #if os(Windows)
+            let errno = Int32(GetLastError())
+            #endif
             let error = IOError(errnoCode: errno, reason: #function)
             return self.loop.makeFailedFuture(error)
         }
@@ -127,6 +134,25 @@ extension DNSClient {
          .map { "\($0)" }
          .joined(separator: ".")
          .appending(".ip6.arpa.")
+        #elseif os(Windows)
+        let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            ipv6Addr.u.Byte.0,
+            ipv6Addr.u.Byte.1,
+            ipv6Addr.u.Byte.2,
+            ipv6Addr.u.Byte.3,
+            ipv6Addr.u.Byte.4,
+            ipv6Addr.u.Byte.5,
+            ipv6Addr.u.Byte.6,
+            ipv6Addr.u.Byte.7,
+            ipv6Addr.u.Byte.8,
+            ipv6Addr.u.Byte.9,
+            ipv6Addr.u.Byte.10,
+            ipv6Addr.u.Byte.11,
+            ipv6Addr.u.Byte.12,
+            ipv6Addr.u.Byte.13,
+            ipv6Addr.u.Byte.14,
+            ipv6Addr.u.Byte.15
+        )
         #else
         let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
                       ipv6Addr.__u6_addr.__u6_addr8.0,
