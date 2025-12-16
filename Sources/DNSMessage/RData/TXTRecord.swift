@@ -1,47 +1,69 @@
+import Foundation
 import NIOCore
 
-/// A text record. This is used for storing arbitrary text.
-public struct TXTRecord: DNSResource {
-    /// The values of the text record. This is a dictionary of key-value pairs.
-    public let values: [String: String]
-    public let rawValues: [String]
+/// 3.3.14. TXT RDATA format
+///
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///     /                   TXT-DATA                    /
+///     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+///
+/// where:
+///
+/// TXT-DATA        One or more <character-string>s.
+///
+/// TXT RRs are used to hold descriptive text.  The semantics of the text
+/// depends on the domain where it is found.
+public struct TXTRecord: DNSResourceData {
+    public var txtData: [DNSCharacterString]
 
-    init(values: [String: String], rawValues: [String]) {
-        self.values = values
-        self.rawValues = rawValues
+    public var description: String {
+        txtData.map({ $0.description }).joined(separator: " ")
     }
 
-    public static func read(from buffer: inout ByteBuffer, length: Int) -> TXTRecord? {
-        var currentIndex = 0
-        var components: [String: String] = [:]
-        var rawValues: [String] = []
+    public static let name: String = "TXT"
+    public static let encoding: DNSRDataEncoding = .standardRecord
+    public static let resourceType: DNSResourceType = .txt
 
-        while currentIndex < length {
-            guard let componentLenght = buffer.readInteger(endianness: .big, as: UInt8.self) else {
-                return nil
-            }
+    public init(from decoder: inout DNSDecoder, length: Int) throws {
+        var txtData: [DNSCharacterString] = []
+        var remainingLength = length
 
-            currentIndex += (Int(componentLenght) + 1)
-
-            guard let componentString = buffer.readString(length: Int(componentLenght)) else {
-                return nil
-            }
-
-            rawValues.append(componentString)
-
-            let parts = componentString.split(separator: "=")
-
-            if parts.count != 2 {
-                continue
-            }
-
-            components[String(parts[0])] = String(parts[1])
+        while remainingLength > 0 {
+            let txt = try decoder.readCharacterString()
+            remainingLength -= txt.count + 1
+            txtData.append(txt)
         }
 
-        return TXTRecord(values: components, rawValues: rawValues)
+        self.txtData = txtData
     }
 
-    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        fatalError()
+    public init(txtStrings: [String]) throws {
+        let txtData = try txtStrings.map { try DNSCharacterString(string: $0) }
+
+        let totalBytes = txtData.reduce(0) { $0 + $1.count + 1 }  // +1 for length prefix per string
+        guard totalBytes <= Int(UInt16.max) else {
+            throw DNSMessageError.rDataTooLarge(totalSize: totalBytes, maxSize: Int(UInt16.max))
+        }
+
+        self.txtData = txtData
+    }
+
+    public init(txtData: [DNSCharacterString]) throws {
+        let totalBytes = txtData.reduce(0) { $0 + $1.count + 1 }  // +1 for length prefix per string
+        guard totalBytes <= Int(UInt16.max) else {
+            throw DNSMessageError.rDataTooLarge(totalSize: totalBytes, maxSize: Int(UInt16.max))
+        }
+
+        self.txtData = txtData
+    }
+
+    public func write(encoder: inout DNSEncoder) throws -> Int {
+        var written = 0
+
+        for txt in txtData {
+            written += try encoder.writeCharacterString(txt)
+        }
+
+        return written
     }
 }

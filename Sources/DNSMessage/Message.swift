@@ -37,19 +37,19 @@
 /// which relate to the query, but are not strictly answers for the
 /// question.
 /// ```
-public struct DNSMessage: Sendable {
+public struct DNSMessage: Sendable, Equatable {
     public var header: DNSHeader
-    public var questions: [QuestionSection]
-    public var answers: [Record]
-    public var authorities: [Record]
-    public var additionalData: [Record]
+    public var questions: [DNSQuestion]
+    public var answers: [DNSRecord]
+    public var authorities: [DNSRecord]
+    public var additionalData: [DNSRecord]
 
     public init(
         header: DNSHeader,
-        questions: [QuestionSection] = [],
-        answers: [Record] = [],
-        authorities: [Record] = [],
-        additionalData: [Record] = []
+        questions: [DNSQuestion] = [],
+        answers: [DNSRecord] = [],
+        authorities: [DNSRecord] = [],
+        additionalData: [DNSRecord] = []
     ) {
         self.header = header
         self.questions = questions
@@ -91,3 +91,48 @@ extension DNSMessage {
 
 @available(*, deprecated, renamed: "DNSMessage")
 public typealias Message = DNSMessage
+
+public struct DNSClientMessage: Sendable {
+    public var opcode: DNSOpcode
+    public var recursionDesired: Bool
+    public var queries: [any DNSQueryProtocol]
+
+    public init(opcode: DNSOpcode = .query, recursionDesired: Bool = true, queries: [any DNSQueryProtocol] = []) {
+        self.opcode = opcode
+        self.recursionDesired = recursionDesired
+        self.queries = queries
+    }
+
+    package func toInternalRepresentation() throws -> DNSMessage {
+        var flags: DNSHeaderFlags = []
+        if self.recursionDesired {
+            flags.insert(.recursionDesired)
+        }
+
+        // Convert EDNS to OPTRecord and place in additionalData
+        // var additionalData: [DNSRecord] = []
+
+        // if let edns = self.edns {
+        //     additionalData.append(try edns.toInternalRepresentation())
+        // }
+
+        let header = DNSHeader(
+            id: UInt16.random(in: 0...UInt16.max),
+            flags: flags,
+            opcode: self.opcode,
+            responseCode: .noError
+        )
+
+        let questions = try self.queries.map({try $0.toInternalRepresentation()})
+
+        return DNSMessage(
+            header: header,
+            questions: questions,
+            answers: [],
+            authorities: [],
+            // additionalData: additionalData,
+            additionalData: []
+            // edns: self.edns
+        )
+    }
+}

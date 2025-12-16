@@ -1,4 +1,4 @@
-import NIOCore
+public import NIOCore
 
 public struct DNSEncoder {
     public var buffer: ByteBuffer
@@ -49,6 +49,45 @@ public struct DNSEncoder {
         }
 
         return try body(&self)
+    }
+
+    /// Automatically encodes a UInt16 length prefix followed by data from the passed function.
+    ///
+    /// Writes a 2-byte length field followed by the data written by the closure. The length
+    /// is calculated automatically based on the number of bytes the closure writes. This is
+    /// commonly used for DNS RDATA fields and other length-prefixed structures.
+    ///
+    /// The closure receives a mutable DNSEncoder reference, allowing access to DNS-specific
+    /// encoding features like name compression and nested length-prefixed structures.
+    public mutating func writeLengthPrefixed(
+        _ writeFunction: (inout DNSEncoder) throws -> Int
+    ) throws -> Int {
+        // Store position where length will be written
+        let lengthOffset = self.buffer.writerIndex
+
+        // Write placeholder for length field (2 bytes for UInt16)
+        var written = self.buffer.writeInteger(UInt16(0))
+
+        // Write the actual data and capture its length
+        let dataLength = try writeFunction(&self)
+        written += dataLength
+
+        // Remember current position (end of data)
+        let endOffset = self.buffer.writerIndex
+
+        // Go back and overwrite placeholder with actual data length
+        self.buffer.moveWriterIndex(to: lengthOffset)
+
+        guard let length = UInt16(exactly: dataLength) else {
+            throw ByteBuffer.LengthPrefixError.messageLengthDoesNotFitExactlyIntoRequiredIntegerFormat
+        }
+
+        _ = self.buffer.writeInteger(length)
+
+        // Restore writer position to end of data
+        self.buffer.moveWriterIndex(to: endOffset)
+
+        return written
     }
 
     /// Writes a domain name using the configured encoding strategy.
@@ -111,6 +150,50 @@ public struct DNSEncoder {
         return written
     }
 
+    /// Writes a character-string to the buffer with length prefix.
+    /// A character-string is a single length octet followed by that number of characters.
+    /// Character-strings can be up to 255 characters in length (not including the length octet).
+    /// - Parameter characterString: The CharacterString to write
+    /// - Returns: The number of bytes written (data length + 1 for length prefix)
+    /// - Throws: DNSMessageError if data exceeds 255 bytes
+    public mutating func writeCharacterString(_ characterString: DNSCharacterString) throws -> Int {
+        try buffer.writeLengthPrefixed(as: UInt8.self) { buffer in
+            buffer.writeBytes(characterString.bytes)
+        }
+    }
+
+    public mutating func writeDNSMessage(_ message: DNSMessage) throws -> Int {
+        self.clearIfNeeded()
+
+        var written = 0
+
+        var header = message.header
+        header.questionCount = UInt16(message.questions.count)
+        header.answerCount = UInt16(message.answers.count)
+        header.authorityCount = UInt16(message.authorities.count)
+        header.additionalDataCount = UInt16(message.additionalData.count)
+
+        written += self.writeDNSHeader(header)
+
+        for question in message.questions {
+            written += try self.writeDNSQuestion(question)
+        }
+
+        for answer in message.answers {
+            written += try self.writeDNSRecord(answer)
+        }
+
+        for authority in message.authorities {
+            written += try self.writeDNSRecord(authority)
+        }
+
+        for data in message.additionalData {
+            written += try self.writeDNSRecord(data)
+        }
+
+        return written
+    }
+
     package init(buffer: ByteBuffer, nameEncoding: DNSNameEncoding = .compressed) {
         self.buffer = buffer
         self.nameEncoding = nameEncoding
@@ -132,6 +215,42 @@ public struct DNSEncoder {
         written += self.buffer.writeInteger(header.additionalDataCount)
 
         return written
+    }
+
+    private mutating func writeDNSQuestion(_ question: DNSQuestion) throws -> Int {
+        var written = 0
+
+        written += try self.writeDNSName(question.name)
+        written += self.buffer.writeInteger(question.type.rawValue)
+        written += self.buffer.writeInteger(question.questionClass.rawValue)
+
+        return written
+    }
+
+    private mutating func writeDNSRecord(_ record: DNSRecord) throws -> Int {
+        var written = 0
+
+        // Write the DNS resource record header fields (RFC 1035 Section 3.2.1)
+        written += try self.writeDNSName(record.name)  // NAME: domain name
+        written += self.buffer.writeInteger(record.rrType.rawValue)  // TYPE: 16-bit record type
+        written += self.buffer.writeInteger(record.recordClass.rawValue)  // CLASS: 16-bit class code
+        written += self.buffer.writeInteger(record.ttl)  // TTL: 32-bit time to live
+
+        written += try self.writeLengthPrefixed { encoder in
+            try encoder.writeRData(record)
+        }
+
+        return written
+    }
+
+    private mutating func writeRData(_ record: DNSRecord) throws -> Int {
+        // Get encoding from registered type, fallback to standard if not registered
+        let recordType = DNSResourceType.registeredType(for: record.rrType)
+        let encoding: DNSRDataEncoding = recordType.encoding
+
+        return try self.withNameEncoding(newEncoding: encoding.toNameEncoding()) { encoder in
+            try record.rDataTypeErased.write(encoder: &encoder)
+        }
     }
 
     private mutating func addNamePointer(name: DNSName, offset: Int) {

@@ -1,5 +1,6 @@
 import Foundation
 import NIO
+public import NIOCore
 
 extension DNSClient {
     /// Connect to the dns server
@@ -9,12 +10,12 @@ extension DNSClient {
     /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
-            let configString = try String(contentsOfFile: "/etc/resolv.conf")
+            let configString = try String(contentsOfFile: "/etc/resolv.conf", encoding: .utf8)
             let config = try ResolvConf(from: configString)
 
             return connect(on: group, config: config.nameservers)
         } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
+            return group.next().makeFailedFuture(DNSClientError.unableToParseConfig())
         }
     }
 
@@ -46,7 +47,7 @@ extension DNSClient {
                 return channel.joinGroup(address).map { client }
             }
         } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
+            return group.next().makeFailedFuture(DNSClientError.unableToParseConfig())
         }
     }
 
@@ -57,12 +58,12 @@ extension DNSClient {
     /// - returns: Future with the NioDNS client
     public static func connectTCP(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
         do {
-            let configString = try String(contentsOfFile: "/etc/resolv.conf")
+            let configString = try String(contentsOfFile: "/etc/resolv.conf", encoding: .utf8)
             let config = try ResolvConf(from: configString)
 
             return connectTCP(on: group, config: config.nameservers)
         } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
+            return group.next().makeFailedFuture(DNSClientError.unableToParseConfig())
         }
     }
 
@@ -92,15 +93,20 @@ extension DNSClient {
         context: DNSClientContext,
         asEnvelopeTo remoteAddress: SocketAddress? = nil
     ) -> EventLoopFuture<Void> {
-        if let remoteAddress = remoteAddress {
-            return channel.pipeline.addHandlers(
-                EnvelopeInboundChannel(),
-                context.decoder,
-                EnvelopeOutboundChannel(address: remoteAddress),
-                DNSEncoder()
-            )
-        } else {
-            return channel.pipeline.addHandlers(context.decoder, DNSEncoder())
+        channel.eventLoop.makeCompletedFuture {
+            if let remoteAddress = remoteAddress {
+                try channel.pipeline.syncOperations.addHandlers(
+                    EnvelopeInboundChannel(),
+                    context.inboundHandler,
+                    EnvelopeOutboundChannel(address: remoteAddress),
+                    DNSClientOutboundHandler()
+                )
+            } else {
+                try channel.pipeline.syncOperations.addHandlers(
+                    context.inboundHandler,
+                    DNSClientOutboundHandler()
+                )
+            }
         }
     }
 
@@ -111,21 +117,23 @@ extension DNSClient {
     /// - returns: Future with the NioDNS client
     public static func connect(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
-            return group.next().makeFailedFuture(MissingNameservers())
+            return group.next().makeFailedFuture(DNSClientError.missingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
             .channelInitializer { channel in
-                channel.pipeline.addHandlers(
-                    EnvelopeInboundChannel(),
-                    dnsDecoder,
-                    EnvelopeOutboundChannel(address: address),
-                    DNSEncoder()
-                )
+                channel.eventLoop.makeCompletedFuture {
+                    try channel.pipeline.syncOperations.addHandlers(
+                        EnvelopeInboundChannel(),
+                        inboundHandler,
+                        EnvelopeOutboundChannel(address: address),
+                        DNSClientOutboundHandler()
+                    )
+                }
             }
 
         let ipv4 = address.protocol.rawValue == PF_INET
@@ -134,10 +142,10 @@ extension DNSClient {
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -149,29 +157,31 @@ extension DNSClient {
     /// - returns: Future with the NioDNS client
     public static func connectTCP(on group: EventLoopGroup, config: [SocketAddress]) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
-            return group.next().makeFailedFuture(MissingNameservers())
+            return group.next().makeFailedFuture(DNSClientError.missingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         let bootstrap = ClientBootstrap(group: group)
             .channelInitializer { channel in
-                channel.pipeline.addHandlers(
-                    ByteToMessageHandler(UInt16FrameDecoder()),
-                    MessageToByteHandler(UInt16FrameEncoder()),
-                    dnsDecoder,
-                    DNSEncoder()
-                )
+                channel.eventLoop.makeCompletedFuture {
+                    try channel.pipeline.syncOperations.addHandlers(
+                        ByteToMessageHandler(UInt16FrameDecoder()),
+                        MessageToByteHandler(UInt16FrameEncoder()),
+                        inboundHandler,
+                        DNSClientOutboundHandler()
+                    )
+                }
             }
 
         return bootstrap.connect(to: address).map { channel in
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -184,7 +194,7 @@ extension Array where Element == SocketAddress {
 }
 
 #if canImport(Network)
-import NIOTransportServices
+public import NIOTransportServices
 
 @available(iOS 12, *)
 extension DNSClient {
@@ -209,23 +219,25 @@ extension DNSClient {
             let ipAddress = address.ipAddress,
             let port = address.port
         else {
-            return group.next().makeFailedFuture(MissingNameservers())
+            return group.next().makeFailedFuture(DNSClientError.missingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         return NIOTSDatagramBootstrap(group: group).channelInitializer { channel in
-            channel.pipeline.addHandlers(dnsDecoder, DNSEncoder())
+            channel.eventLoop.makeCompletedFuture {
+                try channel.pipeline.syncOperations.addHandlers(inboundHandler, DNSClientOutboundHandler())
+            }
         }
         .connect(host: ipAddress, port: port)
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -241,7 +253,7 @@ extension DNSClient {
 
             return connectTS(on: group, config: config.nameservers)
         } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
+            return group.next().makeFailedFuture(DNSClientError.unableToParseConfig())
         }
     }
 
@@ -264,28 +276,30 @@ extension DNSClient {
         config: [SocketAddress]
     ) -> EventLoopFuture<DNSClient> {
         guard let address = config.preferred else {
-            return group.next().makeFailedFuture(MissingNameservers())
+            return group.next().makeFailedFuture(DNSClientError.missingNameservers())
         }
 
-        let dnsDecoder = DNSDecoder(group: group)
+        let inboundHandler = DNSClientInboundHandler(group: group)
 
         return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
-            channel.pipeline.addHandlers(
-                ByteToMessageHandler(UInt16FrameDecoder()),
-                MessageToByteHandler(UInt16FrameEncoder()),
-                dnsDecoder,
-                DNSEncoder()
-            )
+            channel.eventLoop.makeCompletedFuture {
+                try channel.pipeline.syncOperations.addHandlers(
+                    ByteToMessageHandler(UInt16FrameDecoder()),
+                    MessageToByteHandler(UInt16FrameEncoder()),
+                    inboundHandler,
+                    DNSClientOutboundHandler()
+                )
+            }
         }
         .connect(to: address)
         .map { channel -> DNSClient in
             let client = DNSClient(
                 channel: channel,
                 address: address,
-                decoder: dnsDecoder
+                inboundHandler: inboundHandler
             )
 
-            dnsDecoder.mainClient = client
+            inboundHandler.mainClient = client
             return client
         }
     }
@@ -301,7 +315,7 @@ extension DNSClient {
 
             return connectTSTCP(on: group, config: config.nameservers)
         } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
+            return group.next().makeFailedFuture(DNSClientError.unableToParseConfig())
         }
     }
 }

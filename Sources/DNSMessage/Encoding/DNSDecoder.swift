@@ -1,4 +1,4 @@
-import NIOCore
+public import NIOCore
 
 public struct DNSDecoder {
     public var buffer: ByteBuffer
@@ -7,6 +7,34 @@ public struct DNSDecoder {
         self.buffer = buffer
     }
 
+    /// Reads a character-string from the buffer.
+    /// A character-string is a single length octet followed by that number of characters.
+    /// Character-strings can be up to 255 characters in length (not including the length octet).
+    /// - Returns: A CharacterString containing the decoded data
+    /// - Throws: DNSMessageError if insufficient data or invalid format
+    public mutating func readCharacterString() throws -> DNSCharacterString {
+        guard let length: UInt8 = buffer.readInteger() else {
+            throw DNSMessageError.insufficientData(expected: 1, available: buffer.readableBytes)
+        }
+
+        guard let data = buffer.readBytes(length: Int(length)) else {
+            throw DNSMessageError.insufficientData(
+                expected: Int(length),
+                available: buffer.readableBytes
+            )
+        }
+
+        return try DNSCharacterString(bytes: data)
+    }
+
+    /// Reads a DNS name from the buffer, handling label compression.
+    ///
+    /// DNS names consist of length-prefixed labels terminated by a zero-length label.
+    /// Supports RFC 1035 name compression where labels can be replaced by 2-byte pointers
+    /// to previously encoded names within the same message to reduce size.
+    ///
+    /// - Parameter name: The DNSName to append decoded labels to
+    /// - Throws: DNSMessageError for malformed names, invalid pointers, or insufficient data
     public mutating func readDNSName(name: inout DNSName) throws {
         while let length = buffer.readInteger(as: UInt8.self) {
             switch length {
@@ -47,7 +75,48 @@ public struct DNSDecoder {
         throw DNSMessageError.insufficientData(expected: 1, available: buffer.readableBytes)
     }
 
-    internal mutating func readDNSHeader() throws -> DNSHeader {
+    /// Reads a complete DNS message from the buffer.
+    ///
+    /// Decodes the standard DNS message format: header followed by question, answer,
+    /// authority, and additional record sections. The header contains counts for each
+    /// section which determines how many records to read from each section.
+    ///
+    /// - Returns: A fully decoded DNSMessage
+    /// - Throws: DNSMessageError for malformed messages or insufficient data
+    public mutating func readDNSMessage() throws -> DNSMessage {
+        let header = try self.readDNSHeader()
+
+        var questions: [DNSQuestion] = []
+        var answers: [DNSRecord] = []
+        var authorities: [DNSRecord] = []
+        var additionalData: [DNSRecord] = []
+
+        for _ in 0..<header.questionCount {
+            questions.append(try self.readDNSQuestion())
+        }
+
+        for _ in 0..<header.answerCount {
+            answers.append(try self.readDNSRecord())
+        }
+
+        for _ in 0..<header.authorityCount {
+            authorities.append(try self.readDNSRecord())
+        }
+
+        for _ in 0..<header.additionalDataCount {
+            additionalData.append(try self.readDNSRecord())
+        }
+
+        return DNSMessage(
+            header: header,
+            questions: questions,
+            answers: answers,
+            authorities: authorities,
+            additionalData: additionalData
+        )
+    }
+
+    private mutating func readDNSHeader() throws -> DNSHeader {
         // Read the fields in order: ID, FLAGS, QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT
         guard let id = self.buffer.readInteger(as: UInt16.self),
             let rawFlags = self.buffer.readInteger(as: UInt16.self),
@@ -75,6 +144,51 @@ public struct DNSDecoder {
             answerCount: answerCount,
             authorityCount: authorityCount,
             additionalDataCount: additionalDataCount
+        )
+    }
+
+    private mutating func readDNSQuestion() throws -> DNSQuestion {
+        var name = DNSName()
+        try self.readDNSName(name: &name)
+        guard
+            let typeRaw: UInt16 = self.buffer.readInteger(),
+            let questionClassRaw: UInt16 = self.buffer.readInteger()
+        else {
+            throw DNSMessageError.insufficientData(expected: 4, available: buffer.readableBytes)
+        }
+
+        return try DNSQuestion(
+            name: name,
+            type: .init(rawValue: typeRaw),
+            questionClass: .init(rawValue: questionClassRaw)
+        )
+    }
+
+    private mutating func readDNSRecord() throws -> DNSRecord {
+        var name = DNSName()
+        try self.readDNSName(name: &name)
+        guard
+            let rrTypeRaw: UInt16 = self.buffer.readInteger(),
+            let dnsClassRaw: UInt16 = self.buffer.readInteger(),
+            let ttl: UInt32 = self.buffer.readInteger(),
+            let length: UInt16 = self.buffer.readInteger()
+        else {
+            throw DNSMessageError.insufficientData(expected: 10, available: buffer.readableBytes)
+        }
+
+        let recordType = DNSResourceType(rawValue: rrTypeRaw)
+        let recordClass = DNSClass(rawValue: dnsClassRaw)
+
+        let recordDataType = DNSResourceType.registeredType(for: recordType)
+        // Parse using the registered type or as NULLRecord if it is not registered
+        let rdata = try recordDataType.init(from: &self, length: Int(length))
+
+        return try DNSRecord(
+            name: name,
+            rrType: recordType,
+            dnsClass: recordClass,
+            ttl: ttl,
+            rData: rdata
         )
     }
 }

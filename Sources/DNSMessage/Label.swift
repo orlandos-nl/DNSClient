@@ -38,7 +38,7 @@ public struct DNSLabel: Sendable, CustomStringConvertible, Hashable {
             } else if label.count >= 64 {
                 throw DNSMessageError.labelTooLong(label.count)
             } else if !label.allSatisfy({ $0.isASCII }) {
-                throw DNSMessageError.labelNotAsciiEncoded(label)
+                throw DNSMessageError.stringNotAsciiEncoded(label)
             } else {
                 throw DNSMessageError.invalidLabelFormat(label)
             }

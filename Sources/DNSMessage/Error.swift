@@ -9,11 +9,11 @@ public struct DNSMessageError: Error, Equatable, Hashable, Sendable {
     }
 
     /// The provided string is not ASCII encoded.
-    /// - Parameter label: The label that is not ASCII encoded.
+    /// - Parameter string: The string that is not ASCII encoded.
     /// - Returns: An Error representing this failure.
     @inline(never)
-    public static func labelNotAsciiEncoded(_ label: String) -> DNSMessageError {
-        Self.init(backing: .labelNotAsciiEncoded(label))
+    public static func stringNotAsciiEncoded(_ string: String) -> DNSMessageError {
+        Self.init(backing: .stringNotAsciiEncoded(string))
     }
 
     /// A DNS label cannot be empty.
@@ -84,11 +84,59 @@ public struct DNSMessageError: Error, Equatable, Hashable, Sendable {
     public static func malformedRecord(recordType: String, reason: String) -> DNSMessageError {
         Self.init(backing: .malformedRecord(recordType: recordType, reason: reason))
     }
+
+    /// Invalid resource type for DNS question.
+    /// - Parameter type: The resource type that is invalid for questions.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func invalidQuestionType(_ type: DNSResourceType) -> DNSMessageError {
+        Self.init(backing: .invalidQuestionType(type))
+    }
+
+    /// Invalid resource type for DNS resource record.
+    /// - Parameter type: The resource type that is invalid for resource records.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func invalidResourceRecordType(_ type: DNSResourceType) -> DNSMessageError {
+        Self.init(backing: .invalidResourceRecordType(type))
+    }
+
+    /// A character-string cannot exceed 255 bytes in length.
+    /// - Parameter length: The length of the character-string that is too long.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func characterStringTooLong(_ length: Int) -> DNSMessageError {
+        Self.init(backing: .characterStringTooLong(length))
+    }
+
+    /// The total size of RDATA cannot exceed the maximum allowed.
+    /// - Parameters:
+    ///   - totalSize: The total size that exceeds the limit.
+    ///   - maxSize: The maximum allowed size.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func rDataTooLarge(totalSize: Int, maxSize: Int) -> DNSMessageError {
+        Self.init(backing: .rDataTooLarge(totalSize: totalSize, maxSize: maxSize))
+    }
+
+    /// A required collection cannot be empty.
+    /// - Parameter collectionName: The name of the collection that cannot be empty.
+    /// - Returns: An Error representing this failure.
+    @inline(never)
+    public static func emptyRequiredCollection(_ collectionName: String) -> DNSMessageError {
+        Self.init(backing: .emptyRequiredCollection(collectionName))
+    }
+}
+
+extension DNSMessageError: CustomStringConvertible {
+    public var description: String {
+        self.backing.description
+    }
 }
 
 extension DNSMessageError {
-    enum Backing: Equatable, Hashable, Sendable {
-        case labelNotAsciiEncoded(String)
+    enum Backing: Equatable, Hashable, Sendable, CustomStringConvertible {
+        case stringNotAsciiEncoded(String)
         case emptyLabel
         case labelTooLong(Int)
         case invalidLabelFormat(String)
@@ -97,5 +145,43 @@ extension DNSMessageError {
         case insufficientData(expected: Int, available: Int)
         case invalidFormat(field: String, reason: String)
         case malformedRecord(recordType: String, reason: String)
+        case invalidQuestionType(DNSResourceType)
+        case invalidResourceRecordType(DNSResourceType)
+        case characterStringTooLong(Int)
+        case rDataTooLarge(totalSize: Int, maxSize: Int)
+        case emptyRequiredCollection(String)
+
+        var description: String {
+            switch self {
+            case .stringNotAsciiEncoded(let string):
+                return "String is not ASCII encoded: \(string)"
+            case .emptyLabel:
+                return "DNS label cannot be empty"
+            case .labelTooLong(let length):
+                return "DNS label too long: \(length) bytes (max 63)"
+            case .invalidLabelFormat(let label):
+                return "Invalid DNS label format: \(label)"
+            case .nameTooLong(let length):
+                return "DNS name too long: \(length) bytes (max 255)"
+            case .unrecognizedLabelCode(let code):
+                return "Unrecognized DNS label code: 0x\(String(code, radix: 16))"
+            case .insufficientData(let expected, let available):
+                return "Insufficient data: expected \(expected) bytes, got \(available)"
+            case .invalidFormat(let field, let reason):
+                return "Invalid format in \(field): \(reason)"
+            case .malformedRecord(let recordType, let reason):
+                return "Malformed \(recordType) record: \(reason)"
+            case .invalidQuestionType(let type):
+                return "Invalid question type: \(type)"
+            case .invalidResourceRecordType(let type):
+                return "Invalid resource record type: \(type)"
+            case .characterStringTooLong(let length):
+                return "Character string too long: \(length) bytes (max 255)"
+            case .rDataTooLarge(let totalSize, let maxSize):
+                return "RData too large: \(totalSize) bytes (max \(maxSize))"
+            case .emptyRequiredCollection(let field):
+                return "Required collection \(field) cannot be empty"
+            }
+        }
     }
 }
