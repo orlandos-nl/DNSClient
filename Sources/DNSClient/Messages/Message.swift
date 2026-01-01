@@ -54,6 +54,7 @@ public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
     /// Creates a new label from the given bytes.
     public init(bytes: [UInt8]) {
         assert(bytes.count < 64)
+        assert(!bytes.contains(0x2e), "DNSLabel must not contain '.'")
         
         self.label = bytes
         self.length = UInt8(bytes.count)
@@ -196,7 +197,7 @@ public struct NSRecord: DNSResource {
     }
     
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
-        buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+        buffer.writeLabelsNoCompression(labels)
     }
 }
 
@@ -244,8 +245,8 @@ public struct SOARecord: DNSResource {
     
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
         var written = 0
-        written += buffer.writeCompressedLabels(mname, labelIndices: &labelIndices)
-        written += buffer.writeCompressedLabels(rname, labelIndices: &labelIndices)
+        written += buffer.writeLabelsNoCompression(mname)
+        written += buffer.writeLabelsNoCompression(rname)
         written += buffer.writeInteger(serialNumber)
         written += buffer.writeInteger(refreshInterval)
         written += buffer.writeInteger(retryInterval)
@@ -321,7 +322,7 @@ public struct MXRecord: DNSResource {
 
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
         let length = buffer.writeInteger(preference)
-        return length + buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+        return length + buffer.writeLabelsNoCompression(labels)
     }
 }
 
@@ -338,7 +339,7 @@ public struct CNAMERecord: DNSResource {
     }
 
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
+        buffer.writeLabelsNoCompression(labels)
     }
 }
 
@@ -509,6 +510,19 @@ extension ByteBuffer {
         return written
     }
     
+    /// RFC1035 compliant, no-compression label writer.
+    /// Always writes full labels and a terminating zero.
+    @discardableResult
+    mutating func writeLabelsNoCompression(_ labels: [DNSLabel]) -> Int {
+        var written = 0
+        for label in labels {
+            written += writeInteger(UInt8(label.label.count))
+            written += writeBytes(label.label)
+        }
+        written += writeInteger(UInt8(0)) // root terminator
+        return written
+    }
+    
     func labelsSize(_ labels: [DNSLabel]) -> Int {
         return labels.reduce(0, { $0 + 2 + $1.label.count })
     }
@@ -533,5 +547,19 @@ public struct Message: Sendable {
         self.answers = answers
         self.authorities = authorities
         self.additionalData = additionalData
+    }
+}
+
+extension Array where Element == DNSLabel {
+
+    /// Construct DNS labels from a fully-qualified domain name.
+    ///
+    /// - Parameter domain: e.g. "example.com" or "www.example.com."
+    /// - Returns: ["example", "com"]
+    public static func fromDomainName(_ domain: String) -> [DNSLabel] {
+        domain
+            .split(separator: ".")
+            .filter { !$0.isEmpty }
+            .map { DNSLabel(stringLiteral: String($0)) }
     }
 }

@@ -79,7 +79,7 @@ public final class DNSEncoder: ChannelOutboundHandler {
         out.write(header)
 
         for question in message.questions {
-            out.writeCompressedLabels(question.labels, labelIndices: &labelIndices)
+            out.writeLabelsNoCompression(question.labels)
 
             out.writeInteger(question.type.rawValue, endianness: .big)
             out.writeInteger(question.questionClass.rawValue, endianness: .big)

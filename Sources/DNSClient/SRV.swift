@@ -31,6 +31,6 @@ public struct SRVRecord: DNSResource {
         var length = buffer.writeInteger(priority)
         length += buffer.writeInteger(weight)
         length += buffer.writeInteger(port)
-        return length + buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
+        return length + buffer.writeLabelsNoCompression(domainName)
     }
 }

@@ -13,7 +13,7 @@ public struct PTRRecord: DNSResource {
     }
 
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
+        buffer.writeLabelsNoCompression(domainName)
     }
 
     public init(domainName: [DNSLabel]) {

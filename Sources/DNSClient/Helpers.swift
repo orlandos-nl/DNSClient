@@ -37,8 +37,6 @@ extension ByteBuffer {
 
         while let length = readInteger(endianness: .big, as: UInt8.self) {
             if length == 0 {
-                labels.append("")
-
                 return labels
             } else if length >= 64 {
                 guard length & 0b11000000 == 0b11000000 else {
@@ -102,7 +100,7 @@ extension ByteBuffer {
         _ record: ResourceRecord<RecordType>,
         labelIndices: inout [String: UInt16]
     ) throws {
-        writeCompressedLabels(record.domainName, labelIndices: &labelIndices)
+        writeLabelsNoCompression(record.domainName)
         writeInteger(record.dataType)
         writeInteger(record.dataClass)
         writeInteger(record.ttl)
