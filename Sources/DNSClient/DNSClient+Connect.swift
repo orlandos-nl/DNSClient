@@ -152,9 +152,11 @@ extension DNSClient {
         
         let bootstrap = ClientBootstrap(group: group)
             .channelInitializer { channel in
+                let frameDecoder = ByteToMessageHandler(UInt16FrameDecoder())
+                let frameEncoder = MessageToByteHandler(UInt16FrameEncoder())
                 return channel.pipeline.addHandlers(
-                    ByteToMessageHandler(UInt16FrameDecoder()),
-                    MessageToByteHandler(UInt16FrameEncoder()),
+                    frameDecoder,
+                    frameEncoder,
                     dnsDecoder,
                     DNSEncoder()
                 )
@@ -263,9 +265,11 @@ extension DNSClient {
         let dnsDecoder = DNSDecoder(group: group)
         
         return NIOTSConnectionBootstrap(group: group).channelInitializer { channel in
+            let frameDecoder = ByteToMessageHandler(UInt16FrameDecoder())
+            let frameEncoder = MessageToByteHandler(UInt16FrameEncoder())
             return channel.pipeline.addHandlers(
-                ByteToMessageHandler(UInt16FrameDecoder()),
-                MessageToByteHandler(UInt16FrameEncoder()),
+                frameDecoder,
+                frameEncoder,
                 dnsDecoder,
                 DNSEncoder()
             )
