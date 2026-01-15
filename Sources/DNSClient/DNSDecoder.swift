@@ -16,6 +16,7 @@ final class EnvelopeInboundChannel: ChannelInboundHandler {
 public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
     let group: EventLoopGroup
     let messageCache = NIOLockedValueBox<[UInt16: SentQuery]>([:])
+    let multicastCache = NIOLockedValueBox<[UInt16: SentMulticastQuery]>([:])
     let clients = NIOLockedValueBox<[ObjectIdentifier: DNSClient]>([:])
     weak var mainClient: DNSClient?
 
@@ -40,6 +41,20 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
+        // Check multicast cache first - accumulate responses
+        let handledByMulticast = multicastCache.withLockedValue { cache -> Bool in
+            guard let query = cache[message.header.id] else {
+                return false
+            }
+            query.addResponse(message)
+            return true
+        }
+
+        if handledByMulticast {
+            return
+        }
+
+        // Regular unicast query - complete on first response
         messageCache.withLockedValue { cache in
             guard let query = cache[message.header.id] else {
                 return
