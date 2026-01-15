@@ -78,46 +78,6 @@ extension DNSClient {
         }
     }
 
-    /// Send a question to the dns host
-    ///
-    /// - Parameters:
-    ///     - address: The hostname address to request a certain resource from
-    ///     - type: The resource you want to request
-    ///     - additionalOptions: Additional message options
-    ///     - timeout: Timeout for this query (default: 30s to preserve existing behavior)
-    /// - Returns: A future with the response message
-    public func sendQuery(
-        forHost address: String,
-        type: DNSResourceType,
-        additionalOptions: MessageOptions? = nil,
-        timeout: TimeAmount = .seconds(30)
-    ) -> EventLoopFuture<Message> {
-        channel.eventLoop.flatSubmit {
-            let messageID = self.messageID.withLockedValue { id in
-                let newID = id &+ 1
-                id = newID
-                return id
-            }
-            
-            var options: MessageOptions = [.standardQuery]
-            
-            if !self.isMulticast {
-                options.insert(.recursionDesired)
-            }
-            
-            if let additionalOptions = additionalOptions {
-                options.insert(additionalOptions)
-            }
-            
-            let header = DNSMessageHeader(id: messageID, options: options, questionCount: 1, answerCount: 0, authorityCount: 0, additionalRecordCount: 0)
-            let labels = address.split(separator: ".").map(String.init).map(DNSLabel.init)
-            let question = QuestionSection(labels: labels, type: type, questionClass: .internet)
-            let message = Message(header: header, questions: [question], answers: [], authorities: [], additionalData: [])
-            
-            return self.send(message, to: nil, timeout: timeout)
-        }
-    }
-
     // MARK: - Transport primitive (timeout-aware overload + wrapper)
     
     /// Historical behavior wrapper (30s default); forwards to timeout-aware overload.
