@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,11 +6,10 @@ import PackageDescription
 let package = Package(
     name: "DNSClient",
     platforms: [
-        .macOS(.v10_15),
-        .iOS(.v13),
+        .macOS(.v13),
+        .iOS(.v16),
     ],
     products: [
-        // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library(
             name: "DNSClient",
             targets: [
@@ -18,25 +17,37 @@ let package = Package(
             ]),
     ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
-        // Targets can depend on other targets in this package, and on products in packages which this package depends on.
+        .target(
+            name: "DNSProtocol",
+            dependencies: [
+                .product(name: "NIO", package: "swift-nio"),
+            ]
+        ),
+        .target(
+            name: "DNSClient",
+            dependencies: [
+                "DNSProtocol",
+                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
+                .product(name: "NIO", package: "swift-nio"),
+            ]
+        ),
+        .target(
+            name: "DNSServer",
+            dependencies: [
+                "DNSProtocol",
+                .product(name: "NIO", package: "swift-nio"),
+            ]
+        ),
         .testTarget(
             name: "DNSClientTests",
             dependencies: [
                 .target(name: "DNSClient"),
+                .target(name: "DNSServer"),
                 .product(name: "NIO", package: "swift-nio"),
             ]),
-        .target(
-            name: "DNSClient",
-            dependencies: [
-                .product(name: "NIOTransportServices", package: "swift-nio-transport-services"),
-                .product(name: "NIO", package: "swift-nio"),
-            ]
-        )
     ]
 )

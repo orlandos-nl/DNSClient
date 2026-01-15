@@ -5,10 +5,10 @@ import Foundation
 public struct DNSMessageHeader : Sendable{
     /// The ID of the message. This is used to match responses to requests.
     public internal(set) var id: UInt16
-    
+
     /// The flags of the message.
     public let options: MessageOptions
-    
+
     /// The number of questions in the message.
     public let questionCount: UInt16
 
@@ -42,19 +42,19 @@ public struct DNSMessageHeader : Sendable{
 public struct DNSLabel: ExpressibleByStringLiteral, Sendable {
     /// The length of the label. This is the number of bytes in the label.
     public let length: UInt8
-    
+
     /// The bytes of the label. This is the actual label, not including the length byte. This is a maximum of 63 bytes and is not null terminated. This is the raw bytes of the label, not the UTF-8 representation.
     public let label: [UInt8]
-    
+
     /// Creates a new label from the given string.
     public init(stringLiteral string: String) {
         self.init(bytes: Array(string.utf8))
     }
-    
+
     /// Creates a new label from the given bytes.
     public init(bytes: [UInt8]) {
         assert(bytes.count < 64)
-        
+
         self.label = bytes
         self.length = UInt8(bytes.count)
     }
@@ -93,7 +93,7 @@ public enum DNSResourceType: UInt16, Sendable {
 
     case null
 
-    /// A request for a well known service description. 
+    /// A request for a well known service description.
     case wks
 
     /// A domain name pointer (ie. in-addr.arpa) for address to name
@@ -116,7 +116,7 @@ public enum DNSResourceType: UInt16, Sendable {
 
     /// A request for an SRV record. This is used for service discovery.
     case srv = 33
-    
+
     // QuestionType exclusive
 
     /// A request for a transfer of an entire zone
@@ -134,7 +134,7 @@ public enum DNSResourceType: UInt16, Sendable {
 
 public typealias QuestionType = DNSResourceType
 
-/// The class of the resource record. This is used to determine the format of the record. 
+/// The class of the resource record. This is used to determine the format of the record.
 public enum DataClass: UInt16, Sendable {
     /// The Internet
     case internet = 1
@@ -150,6 +150,12 @@ public struct QuestionSection : Sendable{
     public let labels: [DNSLabel]
     public let type: QuestionType
     public let questionClass: DataClass
+
+    public init(labels: [DNSLabel], type: QuestionType, questionClass: DataClass) {
+        self.labels = labels
+        self.type = type
+        self.questionClass = questionClass
+    }
 }
 
 /// A DNS message. This is the main type used for interacting with the DNS protocol.
@@ -159,7 +165,7 @@ public enum Record : Sendable{
 
     /// An IPv4 address record. This is used for resolving hostnames to IP addresses.
     case a(ResourceRecord<ARecord>)
-    
+
     /// A text record. This is used for storing arbitrary text.
     case txt(ResourceRecord<TXTRecord>)
 
@@ -174,13 +180,13 @@ public enum Record : Sendable{
 
     /// A domain name pointer (ie. in-addr.arpa)
     case ptr(ResourceRecord<PTRRecord>)
-    
+
     /// an authoritative name server
     case ns(ResourceRecord<NSRecord>)
-    
+
     /// marks the start of authority for a zone
     case soa(ResourceRecord<SOARecord>)
-    
+
     /// Any other record. This is used for records that are not yet supported through convenience methods.
     case other(ResourceRecord<ByteBuffer>)
 }
@@ -189,12 +195,16 @@ public enum Record : Sendable{
 /// /// 3.3.11. SOA RDATA format - https://www.rfc-editor.org/rfc/rfc1035.html
 public struct NSRecord: DNSResource {
     public let labels: [DNSLabel]
-    
+
+    public init(labels: [DNSLabel]) {
+        self.labels = labels
+    }
+
     public static func read(from buffer: inout ByteBuffer, length: Int) -> NSRecord? {
         guard let labels = buffer.readLabels() else { return nil }
         return NSRecord(labels: labels)
     }
-    
+
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
         buffer.writeCompressedLabels(labels, labelIndices: &labelIndices)
     }
@@ -207,21 +217,39 @@ public struct SOARecord: DNSResource {
     // Main Name Server - specifies the fully qualified domain name (FQDN)
     // of the authoritative name server for the zone that holds the master copy of the zone file.
     public let mname: [DNSLabel]
-    
+
     // Responsible Person Name - and specifies the email address of the administrator responsible
     // for the DNS zone. This field contains an email address but without the "@" symbol,
     // where the first unescaped dot (.) is interpreted as an "@" sign
     public let rname: [DNSLabel]
-    
+
     // Serial Number - This is a version number for the zone file,
     // a database that contains all of the DNS records for a domain.
     public let serialNumber: UInt32
-    
+
     public let refreshInterval: UInt32
     public let retryInterval: UInt32
     public let expireInterval: UInt32
     public let minimumTTL: UInt32
-    
+
+    public init(
+        mname: [DNSLabel],
+        rname: [DNSLabel],
+        serialNumber: UInt32,
+        refreshInterval: UInt32,
+        retryInterval: UInt32,
+        expireInterval: UInt32,
+        minimumTTL: UInt32
+    ) {
+        self.mname = mname
+        self.rname = rname
+        self.serialNumber = serialNumber
+        self.refreshInterval = refreshInterval
+        self.retryInterval = retryInterval
+        self.expireInterval = expireInterval
+        self.minimumTTL = minimumTTL
+    }
+
     public static func read(from buffer: inout ByteBuffer, length: Int) -> SOARecord? {
         guard
             let mname = buffer.readLabels(),
@@ -232,7 +260,7 @@ public struct SOARecord: DNSResource {
             let expire  = buffer.readInteger(endianness: .big, as: UInt32.self),
             let minimum = buffer.readInteger(endianness: .big, as: UInt32.self)
         else { return nil }
-        
+
         return SOARecord( mname: mname,
                          rname: rname,
                          serialNumber: serial,
@@ -241,7 +269,7 @@ public struct SOARecord: DNSResource {
                          expireInterval: expire,
                          minimumTTL: minimum)
     }
-    
+
     public func write(into buffer: inout ByteBuffer, labelIndices: inout [String : UInt16]) -> Int {
         var written = 0
         written += buffer.writeCompressedLabels(mname, labelIndices: &labelIndices)
@@ -260,8 +288,8 @@ public struct TXTRecord: DNSResource {
     /// The values of the text record. This is a dictionary of key-value pairs.
     public let values: [String: String]
     public let rawValues: [String]
-    
-    init(values: [String: String], rawValues: [String]) {
+
+    public init(values: [String: String], rawValues: [String]) {
         self.values = values
         self.rawValues = rawValues
     }
@@ -270,29 +298,29 @@ public struct TXTRecord: DNSResource {
         var currentIndex = 0
         var components: [String: String] = [:]
         var rawValues: [String] = []
-        
+
         while currentIndex < length {
             guard let componentLenght = buffer.readInteger(endianness: .big, as: UInt8.self) else {
                 return nil
             }
 
             currentIndex += (Int(componentLenght) + 1)
-            
+
             guard let componentString = buffer.readString(length: Int(componentLenght)) else {
                 return nil
             }
 
             rawValues.append(componentString)
-            
+
             let parts = componentString.split(separator: "=")
-            
+
             if parts.count != 2 {
                 continue
             }
-            
+
             components[String(parts[0])] = String(parts[1])
         }
-        
+
         return TXTRecord(values: components, rawValues: rawValues)
     }
 
@@ -308,6 +336,11 @@ public struct MXRecord: DNSResource {
 
     /// The labels of the mail server.
     public let labels: [DNSLabel]
+
+    public init(preference: Int, labels: [DNSLabel]) {
+        self.preference = preference
+        self.labels = labels
+    }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> MXRecord? {
         guard let preference = buffer.readInteger(endianness: .big, as: UInt16.self) else { return nil }
@@ -329,6 +362,10 @@ public struct MXRecord: DNSResource {
 public struct CNAMERecord: DNSResource {
     /// The labels of the alias.
     public let labels: [DNSLabel]
+
+    public init(labels: [DNSLabel]) {
+        self.labels = labels
+    }
 
     public static func read(from buffer: inout ByteBuffer, length: Int) -> CNAMERecord? {
         guard let labels = buffer.readLabels() else {
@@ -374,6 +411,10 @@ public struct AAAARecord: DNSResource {
     /// The address of the record. This is a 128-bit integer.
     public let address: [UInt8]
 
+    public init(address: [UInt8]) {
+        self.address = address
+    }
+
     /// The address of the record as a string.
     public var stringAddress: String {
         String(format: "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
@@ -410,7 +451,7 @@ public struct ResourceRecord<Resource: DNSResource>: Sendable {
 
     /// The time to live of the record. This is the amount of time the record should be cached for.
     public let ttl: UInt32
-    
+
     /// The resource of the record. This is the data of the record.
     public var resource: Resource
 
@@ -449,10 +490,10 @@ extension ByteBuffer: DNSResource {
 
 extension UInt32 {
     /// Converts the UInt32 to a SocketAddress. This is used for converting the address of a DNS record to a SocketAddress.
-    func socketAddress(port: Int) throws -> SocketAddress {
+    public func socketAddress(port: Int) throws -> SocketAddress {
         let text = inet_ntoa(in_addr(s_addr: self.bigEndian))!
         let host = String(cString: text)
-        
+
         return try SocketAddress(ipAddress: host, port: port)
     }
 }
@@ -465,52 +506,9 @@ extension Sequence where Element == DNSLabel {
             if let string = String(bytes: label.label, encoding: .utf8), string.count > 0 {
                 return string
             }
-            
+
             return nil
         }.joined(separator: ".")
-    }
-}
-
-extension ByteBuffer {
-    /// Either write label index or list of labelsf
-    @discardableResult
-    mutating func writeCompressedLabels(_ labels: [DNSLabel], labelIndices: inout [String: UInt16]) -> Int {
-        var written = 0
-        var labels = labels
-        while !labels.isEmpty {
-            let label = labels.removeFirst()
-            // use combined labels as a key for a position in the packet
-            let key = labels.string
-            // if position exists output position or'ed with 0xc000 and return
-            if let labelIndex = labelIndices[key] {
-                written += writeInteger(labelIndex | 0xc000)
-                return written
-            } else {
-                // if no position exists for this combination of labels output the first label
-                labelIndices[key] = numericCast(writerIndex)
-                written += writeInteger(UInt8(label.label.count))
-                written += writeBytes(label.label)
-            }
-        }
-        // write end of labels
-        written += writeInteger(UInt8(0))
-        return written
-    }
-    
-    /// write labels into DNS packet
-    @discardableResult
-    mutating func writeLabels(_ labels: [DNSLabel]) -> Int {
-        var written = 0
-        for label in labels {
-            written += writeInteger(UInt8(label.label.count))
-            written += writeBytes(label.label)
-        }
-        
-        return written
-    }
-    
-    func labelsSize(_ labels: [DNSLabel]) -> Int {
-        return labels.reduce(0, { $0 + 2 + $1.label.count })
     }
 }
 
