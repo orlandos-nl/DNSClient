@@ -1,7 +1,7 @@
 import NIO
 
 extension ByteBuffer {
-    mutating func write(_ header: DNSMessageHeader) {
+    internal mutating func write(_ header: DNSMessageHeader) {
         writeInteger(header.id, endianness: .big)
         writeInteger(header.options.rawValue, endianness: .big)
         writeInteger(header.questionCount, endianness: .big)
@@ -10,7 +10,7 @@ extension ByteBuffer {
         writeInteger(header.additionalRecordCount, endianness: .big)
     }
 
-    mutating func readHeader() -> DNSMessageHeader? {
+    internal mutating func readHeader() -> DNSMessageHeader? {
         guard
             let id = readInteger(endianness: .big, as: UInt16.self),
             let options = readInteger(endianness: .big, as: UInt16.self),
@@ -32,7 +32,7 @@ extension ByteBuffer {
         )
     }
 
-    mutating func readLabels() -> [DNSLabel]? {
+    internal mutating func readLabels() -> [DNSLabel]? {
         var labels = [DNSLabel]()
 
         while let length = readInteger(endianness: .big, as: UInt8.self) {
@@ -81,7 +81,7 @@ extension ByteBuffer {
         return labels
     }
 
-    mutating func readQuestion() -> QuestionSection? {
+    internal mutating func readQuestion() -> QuestionSection? {
         guard let labels = readLabels() else {
             return nil
         }
@@ -98,7 +98,7 @@ extension ByteBuffer {
         return QuestionSection(labels: labels, type: type, questionClass: dataClass)
     }
 
-    mutating func writeRecord<RecordType: DNSResource>(
+    internal mutating func writeRecord<RecordType: DNSResource>(
         _ record: ResourceRecord<RecordType>,
         labelIndices: inout [String: UInt16]
     ) throws {
@@ -112,7 +112,7 @@ extension ByteBuffer {
         }
     }
 
-    mutating func writeAnyRecord(
+    internal mutating func writeAnyRecord(
         _ record: Record,
         labelIndices: inout [String: UInt16]
     ) throws {
@@ -140,7 +140,7 @@ extension ByteBuffer {
         }
     }
 
-    mutating func readRecord() -> Record? {
+    internal mutating func readRecord() -> Record? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),
@@ -150,13 +150,13 @@ extension ByteBuffer {
             else {
                 return nil
         }
-        
+
         let newIndex = readerIndex + Int(dataLength)
-        
+
         guard newIndex <= writerIndex else {
             return nil
         }
-        
+
         defer {
             moveReaderIndex(to: newIndex)
         }
@@ -227,7 +227,7 @@ extension ByteBuffer {
             guard let ns = make(NSRecord.self) else {
                 return nil
             }
-    
+
             return .ns(ns)
         case .soa:
                 guard let soa = make(SOARecord.self) else {
@@ -242,11 +242,11 @@ extension ByteBuffer {
         guard let other = make(ByteBuffer.self) else {
             return nil
         }
-        
+
         return .other(other)
     }
 
-    mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
+    internal mutating func readRawRecord() -> ResourceRecord<ByteBuffer>? {
         guard
             let labels = readLabels(),
             let typeNumber = readInteger(endianness: .big, as: UInt16.self),
@@ -268,5 +268,59 @@ extension ByteBuffer {
 
         self.moveReaderIndex(forwardBy: Int(dataLength))
         return record
+    }
+
+    /// Either write label index or list of labels
+    @discardableResult
+    internal mutating func writeCompressedLabels(_ labels: [DNSLabel], labelIndices: inout [String: UInt16]) -> Int {
+        var written = 0
+        var labels = labels
+        while !labels.isEmpty {
+            // Build key for the full remaining sequence including current label
+            let fullKey = labels.string
+
+            // Empty key means we only have the terminating empty label left
+            if fullKey.isEmpty {
+                // Write terminating null byte
+                written += writeInteger(UInt8(0))
+                return written
+            }
+
+            // Check if we can compress the entire remaining sequence
+            if let labelIndex = labelIndices[fullKey] {
+                // Write compression pointer for the entire remaining sequence
+                written += writeInteger(labelIndex | 0xc000)
+                return written
+            }
+
+            // No compression available - write this label and continue
+            let label = labels.removeFirst()
+
+            // Store position for this label sequence BEFORE writing
+            labelIndices[fullKey] = numericCast(writerIndex)
+
+            // Write the label
+            written += writeInteger(UInt8(label.label.count))
+            written += writeBytes(label.label)
+        }
+        // write end of labels (shouldn't normally reach here with well-formed labels)
+        written += writeInteger(UInt8(0))
+        return written
+    }
+
+    /// write labels into DNS packet
+    @discardableResult
+    internal mutating func writeLabels(_ labels: [DNSLabel]) -> Int {
+        var written = 0
+        for label in labels {
+            written += writeInteger(UInt8(label.label.count))
+            written += writeBytes(label.label)
+        }
+
+        return written
+    }
+
+    internal func labelsSize(_ labels: [DNSLabel]) -> Int {
+        return labels.reduce(0, { $0 + 2 + $1.label.count })
     }
 }
