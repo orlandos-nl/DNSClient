@@ -51,7 +51,7 @@ public class DNSClient: Resolver, @unchecked Sendable {
             let messageID = self.messageID.withLockedValue { id in
                 let newID = id &+ 1
                 id = newID
-                return id
+                return newID
             }
 
             var options: MessageOptions = [.standardQuery, .recursionDesired]
