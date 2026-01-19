@@ -1,4 +1,4 @@
-import XCTest
+import Testing
 import NIO
 @testable import DNSClient
 
@@ -6,133 +6,100 @@ import NIO
 import NIOTransportServices
 #endif
 
-final class DNSTCPClientTests: XCTestCase {
-    var group: MultiThreadedEventLoopGroup!
-    var dnsClient: DNSClient!
+@Suite("DNS TCP Client Tests")
+struct DNSTCPClientTests {
 
-    #if canImport(Network)
-    var nwGroup: NIOTSEventLoopGroup!
-    var nwDnsClient: DNSClient!
-    #endif
-    
-    override func setUpWithError() throws {
-        group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        dnsClient = try DNSClient.connectTCP(on: group, host: "8.8.8.8").wait()
-
-        #if canImport(Network)
-        nwGroup = NIOTSEventLoopGroup(loopCount: 1)
-        nwDnsClient = try DNSClient.connectTSTCP(on: nwGroup, host: "8.8.8.8").wait()
-        #endif
-    }
-    
-    func testClient(_ perform: (DNSClient) throws -> Void) rethrows -> Void {
-        try perform(dnsClient)
-        #if canImport(Network)
-        try perform(nwDnsClient)
-        #endif
-    }
-
-    func testStringAddress() throws {
+    @Test("String address from ARecord")
+    func stringAddress() throws {
         var buffer = ByteBuffer()
         buffer.writeInteger(0x7F000001 as UInt32)
         guard let record = ARecord.read(from: &buffer, length: buffer.readableBytes) else {
-            XCTFail()
+            Issue.record("Failed to read ARecord")
             return
         }
-        
-        XCTAssertEqual(record.stringAddress, "127.0.0.1")
+
+        #expect(record.stringAddress == "127.0.0.1")
     }
-    
-    func testStringAddressAAAA() throws {
+
+    @Test("String address from AAAARecord")
+    func stringAddressAAAA() throws {
         var buffer = ByteBuffer()
         buffer.writeBytes([0x2a, 0x00, 0x14, 0x50, 0x40, 0x01, 0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x0e] as [UInt8])
-        
+
         guard let record = AAAARecord.read(from: &buffer, length: buffer.readableBytes) else {
-            XCTFail()
+            Issue.record("Failed to read AAAARecord")
             return
         }
-        
-        XCTAssertEqual(record.stringAddress, "2a00:1450:4001:0809:0000:0000:0000:200e")
+
+        #expect(record.stringAddress == "2a00:1450:4001:0809:0000:0000:0000:200e")
     }
-    
-    func testAQuery() throws {
-        try testClient { dnsClient in
-            let results = try dnsClient.initiateAQuery(host: "google.com", port: 443).wait()
-            XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
+
+    @Test("A Query")
+    func aQuery() async throws {
+        try await withTCPClients { dnsClient in
+            let results = try await dnsClient.initiateAQuery(host: "google.com", port: 443).get()
+            #expect(results.count >= 1, "The returned result should be greater than or equal to 1")
         }
     }
 
-    // Test that we can resolve a domain name to an IPv6 address
-    func testAAAAQuery() throws {
-        try testClient { dnsClient in
-            let results = try dnsClient.initiateAAAAQuery(host: "google.com", port: 443).wait()
-            XCTAssertGreaterThanOrEqual(results.count, 1, "The returned result should be greater than or equal to 1")
+    @Test("AAAA Query")
+    func aaaaQuery() async throws {
+        try await withTCPClients { dnsClient in
+            let results = try await dnsClient.initiateAAAAQuery(host: "google.com", port: 443).get()
+            #expect(results.count >= 1, "The returned result should be greater than or equal to 1")
         }
     }
 
-    // Given a domain name, test that we can resolve it to an IPv4 address
-    func testSendQueryA() throws {
-        try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "google.com", type: .a).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    @Test("Send A Query")
+    func sendQueryA() async throws {
+        try await withTCPClients { dnsClient in
+            let result = try await dnsClient.sendQuery(forHost: "google.com", type: .a).get()
+            #expect(result.header.answerCount >= 1, "The returned answers should be greater than or equal to 1")
         }
     }
 
-    // Test that we can resolve example.com to an IPv6 address
-    func testResolveExampleCom() throws {
-        try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "example.com", type: .aaaa).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
-        }
-    }
-    
-    func testSendTxtQuery() throws {
-        try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "google.com", type: .txt).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
-        }
-    }
-    
-    func testSendQueryMX() throws {
-        try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "gmail.com", type: .mx).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    @Test("Resolve example.com to IPv6")
+    func resolveExampleCom() async throws {
+        try await withTCPClients { dnsClient in
+            let result = try await dnsClient.sendQuery(forHost: "example.com", type: .aaaa).get()
+            #expect(result.header.answerCount >= 1, "The returned answers should be greater than or equal to 1")
         }
     }
 
-    func testSendQueryCNAME() throws {
-        try testClient { dnsClient in
-            let result = try dnsClient.sendQuery(forHost: "www.youtube.com", type: .cName).wait()
-            XCTAssertGreaterThanOrEqual(result.header.answerCount, 1, "The returned answers should be greater than or equal to 1")
+    @Test("Send TXT Query")
+    func sendTxtQuery() async throws {
+        try await withTCPClients { dnsClient in
+            let result = try await dnsClient.sendQuery(forHost: "google.com", type: .txt).get()
+            #expect(result.header.answerCount >= 1, "The returned answers should be greater than or equal to 1")
         }
     }
 
-    func testSRVRecords() throws {
-        try testClient { dnsClient in
-            let answers = try dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com").wait()
-            XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
+    @Test("Send MX Query")
+    func sendQueryMX() async throws {
+        try await withTCPClients { dnsClient in
+            let result = try await dnsClient.sendQuery(forHost: "gmail.com", type: .mx).get()
+            #expect(result.header.answerCount >= 1, "The returned answers should be greater than or equal to 1")
         }
     }
-    
-    func testSRVRecordsAsyncRequest() throws {
-        testClient { dnsClient in
-            let expectation = self.expectation(description: "getSRVRecords")
-            
-            dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com")
-                .whenComplete { (result) in
-                    switch result {
-                    case .failure(let error):
-                        XCTFail("\(error)")
-                    case .success(let answers):
-                        XCTAssertGreaterThanOrEqual(answers.count, 1, "The returned answers should be greater than or equal to 1")
-                    }
-                    expectation.fulfill()
-                }
-            self.waitForExpectations(timeout: 5, handler: nil)
+
+    @Test("Send CNAME Query")
+    func sendQueryCNAME() async throws {
+        try await withTCPClients { dnsClient in
+            let result = try await dnsClient.sendQuery(forHost: "www.youtube.com", type: .cName).get()
+            #expect(result.header.answerCount >= 1, "The returned answers should be greater than or equal to 1")
         }
     }
-    
-    func testThreadSafety() async throws {
+
+    @Test("SRV Records")
+    func srvRecords() async throws {
+        try await withTCPClients { dnsClient in
+            let answers = try await dnsClient.getSRVRecords(from: "_caldavs._tcp.google.com").get()
+            #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        }
+    }
+
+    @Test("Thread Safety")
+    func threadSafety() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let client = try await DNSClient.connectTCP(
             on: eventLoopGroup.next(),
@@ -142,19 +109,28 @@ final class DNSTCPClientTests: XCTestCase {
         async let result = client.initiateAAAAQuery(host: hostname, port: 0).get()
         async let result2 = client.initiateAAAAQuery(host: hostname, port: 0).get()
         async let result3 = client.initiateAAAAQuery(host: hostname, port: 0).get()
-        
+
         _ = try await [result, result2, result3]
-        
-        try await client.channel.close(mode: .all).get()
+
+        try await client.channel.close(mode: .all)
+        try await eventLoopGroup.shutdownGracefully()
     }
-    
-    func testAll() throws {
-        try testSRVRecords()
-        try testSRVRecordsAsyncRequest()
-        try testSendQueryMX()
-        try testSendQueryCNAME()
-        try testSendTxtQuery()
-        try testAQuery()
-        try testAAAAQuery()
-    }
+}
+
+// MARK: - Helpers
+
+private func withTCPClients(_ perform: (DNSClient) async throws -> Void) async throws {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+    let dnsClient = try await DNSClient.connectTCP(on: group, host: "8.8.8.8").get()
+    try await perform(dnsClient)
+    try await group.shutdownGracefully()
+
+    #if canImport(Network)
+    let nwGroup = NIOTSEventLoopGroup(loopCount: 1)
+
+    let nwDnsClient = try await DNSClient.connectTSTCP(on: nwGroup, host: "8.8.8.8").get()
+    try await perform(nwDnsClient)
+    try await nwGroup.shutdownGracefully()
+    #endif
 }

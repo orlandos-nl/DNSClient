@@ -29,7 +29,7 @@ public struct MessageOptions: OptionSet, ExpressibleByIntegerLiteral, Sendable {
     public static let resultCodeNameError: MessageOptions = 0b00000000_00000011
     public static let resultCodeNotImplemented: MessageOptions = 0b00000000_00000100
     public static let resultCodeNotRefused: MessageOptions = 0b00000000_00000101
-    
+
     public static let multicastResponse: MessageOptions = 0b10000000_00000000
     public static let mutlicastUnauthenticatedDataAcceptable: MessageOptions = 0b00000000_00010000
 

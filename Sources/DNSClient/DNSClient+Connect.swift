@@ -37,23 +37,6 @@ extension DNSClient {
         }
     }
     
-    /// Creates a multicast DNS client. This client will join the multicast group and listen for responses. It will also send queries to the multicast group.
-    /// - parameters:
-    ///    - group: EventLoops to use
-    public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<DNSClient> {
-        do {
-            let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
-            
-            return connect(on: group, config: [address]).flatMap { client in
-                let channel = client.channel as! MulticastChannel
-                client.isMulticast = true
-                return channel.joinGroup(address).map { client }
-            }
-        } catch {
-            return group.next().makeFailedFuture(UnableToParseConfig())
-        }
-    }
-    
     /// Connect to the dns server using TCP
     ///
     /// - parameters:
@@ -141,6 +124,29 @@ extension DNSClient {
 
             dnsDecoder.mainClient = client
             return client
+        }
+    }
+
+    /// Creates a multicast DNS client. This client will join the multicast group and listen for responses.
+    /// It will also send queries to the multicast group.
+    /// - Parameters:
+    ///   - group: EventLoops to use
+    /// - Returns: Future with the MulticastDNSClient
+    public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<MulticastDNSClient> {
+        do {
+            let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
+
+            return connect(on: group, config: [address]).flatMap { client in
+                let channel = client.channel as! MulticastChannel
+                let multicastClient = MulticastDNSClient(
+                    channel: channel,
+                    address: address,
+                    decoder: client.dnsDecoder
+                )
+                return channel.joinGroup(address).map { multicastClient }
+            }
+        } catch {
+            return group.next().makeFailedFuture(UnableToParseConfig())
         }
     }
     

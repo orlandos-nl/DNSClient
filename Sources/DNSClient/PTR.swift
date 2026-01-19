@@ -1,29 +1,10 @@
 import NIO
+import DNSProtocol
+
 #if os(Windows)
 import ucrt
 import WinSDK
 #endif
-
-/// A DNS PTR record. This is used for address to name mapping.
-public struct PTRRecord: DNSResource {
-    /// A  domain-name which points to some location in the domain name space.
-    public let domainName: [DNSLabel]
-
-    public static func read(from buffer: inout ByteBuffer, length: Int) -> PTRRecord? {
-        guard let domainName = buffer.readLabels() else {
-            return nil
-        }
-        return PTRRecord(domainName: domainName)
-    }
-
-    public func write(into buffer: inout ByteBuffer, labelIndices: inout [String: UInt16]) -> Int {
-        buffer.writeCompressedLabels(domainName, labelIndices: &labelIndices)
-    }
-
-    public init(domainName: [DNSLabel]) {
-        self.domainName = domainName
-    }
-}
 
 extension DNSClient {
     /// Request IPv4 inverse address (PTR records) from nameserver
@@ -50,7 +31,7 @@ extension DNSClient {
             .reversed()
             .joined(separator: ".")
             .appending(".in-addr.arpa.")
-        
+
         return self.sendQuery(forHost: inAddrArpaDomain, type: .ptr).map { message in
             return message.answers.compactMap { answer in
                 guard case .ptr(let record) = answer else { return nil }
@@ -58,7 +39,7 @@ extension DNSClient {
             }
         }
     }
-    
+
     /// Request IPv6 inverse address (PTR records) from nameserver
     ///
     ///  Inverse addressing queries use DNS PTR Records.
@@ -72,11 +53,11 @@ extension DNSClient {
     ///            is invalid or if a network error occurs.
     public func ipv6InverseAddress(_ address: String) -> EventLoopFuture<[ResourceRecord<PTRRecord>]> {
         var ipv6Addr = in6_addr()
-        
+
         let retval = withUnsafeMutablePointer(to: &ipv6Addr) {
             inet_pton(AF_INET6, address, UnsafeMutablePointer($0))
         }
-        
+
         // If inet_pton fails, return a pre-failed future immediately.
         if retval == 0 {
             let error = IOError(errnoCode: EINVAL, reason: #function)
@@ -88,7 +69,7 @@ extension DNSClient {
             let error = IOError(errnoCode: errno, reason: #function)
             return self.loop.makeFailedFuture(error)
         }
-        
+
         #if canImport(Glibc)
         let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
                       ipv6Addr.__in6_u.__u6_addr8.0,
@@ -111,7 +92,7 @@ extension DNSClient {
          .map { "\($0)" }
          .joined(separator: ".")
          .appending(".ip6.arpa.")
-        
+
         #elseif canImport(Musl)
         let inAddrArpaDomain = String(format: "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
                       ipv6Addr.__in6_union.__s6_addr.0,
@@ -176,18 +157,12 @@ extension DNSClient {
          .joined(separator: ".")
          .appending(".ip6.arpa.")
         #endif
-        
+
         return self.sendQuery(forHost: inAddrArpaDomain, type: .ptr).map { message in
             return message.answers.compactMap { answer in
                 guard case .ptr(let record) = answer else { return nil }
                 return record
             }
         }
-    }
-}
-
-extension PTRRecord: CustomStringConvertible {
-    public var description: String {
-        "\(Self.self): " + domainName.string
     }
 }
