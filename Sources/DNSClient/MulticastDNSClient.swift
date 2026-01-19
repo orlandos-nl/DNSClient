@@ -1,6 +1,7 @@
 import NIO
 import NIOConcurrencyHelpers
 
+
 /// A DNS client specialized for multicast DNS (mDNS) operations.
 /// Unlike regular DNS, multicast DNS allows discovering services and devices on a local network
 /// by sending queries to a multicast group where multiple devices may respond.
@@ -19,9 +20,9 @@ public final class MulticastDNSClient: DNSClient, @unchecked Sendable {
         let dnsDecoder = DNSDecoder(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)
+            .channelOption(.socketOption(.so_reuseaddr), value: 1)
             #if !os(Windows)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelOption(.socketOption(.so_reuseport), value: 1)
             #endif
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(

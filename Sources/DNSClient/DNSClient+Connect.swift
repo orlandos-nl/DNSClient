@@ -100,9 +100,9 @@ extension DNSClient {
         let dnsDecoder = DNSDecoder(group: group)
 
         let bootstrap = DatagramBootstrap(group: group)
+            .channelOption(.socketOption(.so_reuseaddr), value: 1)
             #if !os(Windows)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+            .channelOption(.socketOption(.so_reuseport), value: 1)
             #endif
             .channelInitializer { channel in
                 return channel.pipeline.addHandlers(
@@ -131,19 +131,44 @@ extension DNSClient {
     /// It will also send queries to the multicast group.
     /// - Parameters:
     ///   - group: EventLoops to use
+    ///   - port: Local port to bind to (default: 5353 for mDNS)
+    ///   - device: Optional network device to use for multicast. If nil, uses the system default.
+    ///             On systems with multiple network interfaces, specify this to ensure multicast
+    ///             joins the correct network.
     /// - Returns: Future with the MulticastDNSClient
-    public static func connectMulticast(on group: EventLoopGroup) -> EventLoopFuture<MulticastDNSClient> {
+    public static func connectMulticast(
+        on group: EventLoopGroup,
+        port: Int = 5353,
+        device: NIONetworkDevice? = nil
+    ) -> EventLoopFuture<MulticastDNSClient> {
         do {
             let address = try SocketAddress(ipAddress: "224.0.0.251", port: 5353)
+            let dnsDecoder = DNSDecoder(group: group)
 
-            return connect(on: group, config: [address]).flatMap { client in
-                let channel = client.channel as! MulticastChannel
-                let multicastClient = MulticastDNSClient(
+            let bootstrap = DatagramBootstrap(group: group)
+                .channelOption(.socketOption(.so_reuseaddr), value: 1)
+                #if !os(Windows)
+                .channelOption(.socketOption(.so_reuseport), value: 1)
+                #endif
+                .channelInitializer { channel in
+                    return channel.pipeline.addHandlers(
+                        EnvelopeInboundChannel(),
+                        dnsDecoder,
+                        EnvelopeOutboundChannel(address: address),
+                        DNSEncoder()
+                    )
+                }
+
+            // Bind to mDNS port 5353 for multicast reception
+            return bootstrap.bind(host: "0.0.0.0", port: port).flatMap { channel in
+                let multicastChannel = channel as! MulticastChannel
+                let client = MulticastDNSClient(
                     channel: channel,
                     address: address,
-                    decoder: client.dnsDecoder
+                    decoder: dnsDecoder
                 )
-                return channel.joinGroup(address).map { multicastClient }
+                dnsDecoder.mainClient = client
+                return multicastChannel.joinGroup(address, device: device).map { client }
             }
         } catch {
             return group.next().makeFailedFuture(UnableToParseConfig())
