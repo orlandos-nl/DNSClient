@@ -88,7 +88,7 @@ struct DNSUDPClientTests {
             let results = try await dnsClient.initiateNSQuery(forDomain: "example.com").get()
             #expect(results.count == 2)
             let names = results.map { $0.resource.labels.string }.sorted()
-            #expect(names == ["a.iana-servers.net", "b.iana-servers.net"])
+            #expect(names == ["elliott.ns.cloudflare.com", "hera.ns.cloudflare.com"])
         }
     }
 
@@ -97,7 +97,7 @@ struct DNSUDPClientTests {
         try await withDNSClients { dnsClient in
             let results = try await dnsClient.initiateSOAQuery(forDomain: "example.com").get()
             #expect(results.count == 1)
-            #expect(results.first?.resource.mname.string == "ns.icann.org")
+            #expect(results.first?.resource.mname.string == "elliott.ns.cloudflare.com")
         }
     }
 
