@@ -109,6 +109,7 @@ struct DNSUDPClientTests {
         let answers = try await dnsClient.ipv4InverseAddress("8.8.4.4").get()
 
         #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        try await dnsClient.close().get()
         try await group.shutdownGracefully()
     }
 
@@ -120,6 +121,7 @@ struct DNSUDPClientTests {
         let answers = try await dnsClient.ipv4InverseAddress("208.67.222.222").get()
 
         #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        try await dnsClient.close().get()
         try await group.shutdownGracefully()
     }
 
@@ -132,6 +134,7 @@ struct DNSUDPClientTests {
         let answers = try await dnsClient.ipv6InverseAddress("2001:503:c27::2:30").get()
 
         #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        try await dnsClient.close().get()
         try await group.shutdownGracefully()
     }
 
@@ -144,6 +147,7 @@ struct DNSUDPClientTests {
         await #expect(throws: (any Error).self) {
             _ = try await dnsClient.ipv6InverseAddress(":::0").get()
         }
+        try await dnsClient.close().get()
         try await group.shutdownGracefully()
     }
 
@@ -164,6 +168,7 @@ private func withDNSClients(_ perform: (DNSClient) async throws -> Void) async t
 
     let dnsClient = try await DNSClient.connect(on: group, host: "8.8.8.8").get()
     try await perform(dnsClient)
+    try await dnsClient.close().get()
     try await group.shutdownGracefully()
 
     #if canImport(Network)
@@ -171,6 +176,7 @@ private func withDNSClients(_ perform: (DNSClient) async throws -> Void) async t
 
     let nwDnsClient = try await DNSClient.connectTS(on: nwGroup, host: "8.8.8.8").get()
     try await perform(nwDnsClient)
+    try await nwDnsClient.close().get()
     try await nwGroup.shutdownGracefully()
     #endif
 }

@@ -92,7 +92,7 @@ struct DNSServerTests {
 
         // Cleanup
         try await server.stop()
-        _ = client // Keep client alive
+        try await client.close().get()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()
     }
@@ -125,6 +125,7 @@ struct DNSServerTests {
         let response = try await client.sendQuery(forHost: "test.example", type: .a).get()
         #expect(response.header.options.isNameError)
 
+        try await client.close().get()
         try await server.stop()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()
@@ -178,6 +179,7 @@ struct DNSServerTests {
         #expect(response.header.options.isNameError)
 
         // Cleanup
+        try await client.close().get()
         try await server.stop()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()
@@ -226,6 +228,7 @@ struct DNSServerTests {
         #expect(results.count == 1)
 
         // Cleanup
+        try await client.close().get()
         try await server.stop()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()
@@ -278,6 +281,7 @@ struct DNSServerTests {
 
         #expect(results.count == 2)
 
+        try await client.close().get()
         try await server.stop()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()
@@ -318,6 +322,7 @@ struct DNSServerTests {
             let udpClient = try await DNSClient.connect(on: clientGroup, config: [address]).get()
             let udpResults = try await udpClient.initiateAQuery(host: "both.test", port: 80).get()
             #expect(udpResults.count == 1)
+            try await udpClient.close().get()
         }
 
         // Test TCP
@@ -326,6 +331,7 @@ struct DNSServerTests {
             let tcpClient = try await DNSClient.connectTCP(on: clientGroup, config: [address]).get()
             let tcpResults = try await tcpClient.initiateAQuery(host: "both.test", port: 80).get()
             #expect(tcpResults.count == 1)
+            try await tcpClient.close().get()
         }
 
         try await server.stop()
@@ -380,6 +386,7 @@ struct DNSServerTests {
         #expect(record.resource.address == 0x08080808)
         #expect(record.resource.stringAddress == "8.8.8.8")
 
+        try await client.close().get()
         try await server.stop()
         try await serverGroup.shutdownGracefully()
         try await clientGroup.shutdownGracefully()

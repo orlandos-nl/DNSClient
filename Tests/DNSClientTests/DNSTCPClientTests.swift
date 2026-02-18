@@ -112,7 +112,7 @@ struct DNSTCPClientTests {
 
         _ = try await [result, result2, result3]
 
-        try await client.channel.close(mode: .all)
+        try await client.close().get()
         try await eventLoopGroup.shutdownGracefully()
     }
 }
@@ -124,6 +124,7 @@ private func withTCPClients(_ perform: (DNSClient) async throws -> Void) async t
 
     let dnsClient = try await DNSClient.connectTCP(on: group, host: "8.8.8.8").get()
     try await perform(dnsClient)
+    try await dnsClient.close().get()
     try await group.shutdownGracefully()
 
     #if canImport(Network)
@@ -131,6 +132,7 @@ private func withTCPClients(_ perform: (DNSClient) async throws -> Void) async t
 
     let nwDnsClient = try await DNSClient.connectTSTCP(on: nwGroup, host: "8.8.8.8").get()
     try await perform(nwDnsClient)
+    try await nwDnsClient.close().get()
     try await nwGroup.shutdownGracefully()
     #endif
 }

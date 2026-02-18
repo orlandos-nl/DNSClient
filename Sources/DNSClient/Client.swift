@@ -30,8 +30,26 @@ public class DNSClient: Resolver, @unchecked Sendable {
         self.dnsDecoder = context.decoder
     }
 
+    /// Closes the client channel and fails any pending queries.
+    ///
+    /// Call this before shutting down the owning `EventLoopGroup`.
+    public func close() -> EventLoopFuture<Void> {
+        return channel.eventLoop.flatSubmit {
+            self.cancelQueries() // CHANGE: fail in-flight promises before channel close.
+            guard self.channel.isActive else {
+                return self.channel.eventLoop.makeSucceededFuture(())
+            }
+            return self.channel.close(mode: .all)
+        }
+    }
+
     deinit {
-        _ = channel.close(mode: .all)
+        // CHANGE: avoid creating close futures during teardown after the event loop
+        // may already be shut down. Explicit lifecycle should call `close()`.
+        cancelQueries()
+        if channel.isActive {
+            channel.close(promise: nil)
+        }
     }
 
     /// Send a question to the dns host
