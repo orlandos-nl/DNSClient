@@ -1,6 +1,7 @@
 import Testing
 import NIO
 import DNSClient
+import DNSServer
 
 #if canImport(Network)
 import NIOTransportServices
@@ -103,39 +104,147 @@ struct DNSUDPClientTests {
 
     @Test("IPv4 Inverse Address")
     func ipv4InverseAddress() async throws {
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let serverGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let clientGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-        let dnsClient = try await DNSClient.connect(on: group, host: "8.8.8.8").get()
+        // CHANGE: make this deterministic and independent from public DNS behavior.
+        let owner = "4.4.8.8.in-addr.arpa"
+        let ownerLabels = owner.split(separator: ".").map(String.init).map(DNSLabel.init) + [DNSLabel(stringLiteral: "")]
+        let ptrRecord = ResourceRecord(
+            domainName: ownerLabels,
+            dataType: DNSResourceType.ptr.rawValue,
+            dataClass: DataClass.internet.rawValue,
+            ttl: 300,
+            resource: PTRRecord(domainName: ["dns", "google", ""])
+        )
+        let delegate = MockDNSDelegate(responses: [owner: [.ptr(ptrRecord)]])
+        let config = DNSServerConfiguration(
+            host: "127.0.0.1",
+            port: 0,
+            enableUDP: true,
+            enableTCP: false
+        )
+        let server = DNSServer(configuration: config, delegate: delegate, eventLoopGroup: serverGroup)
+        try await server.start()
+
+        guard let port = server.udpPort else {
+            Issue.record("Server did not bind to UDP port")
+            return
+        }
+
+        let address = try SocketAddress(ipAddress: "127.0.0.1", port: port)
+        let dnsClient = try await DNSClient.connect(on: clientGroup, config: [address]).get()
         let answers = try await dnsClient.ipv4InverseAddress("8.8.4.4").get()
 
-        #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        #expect(answers.count == 1)
+        #expect(answers.first?.resource.domainName.string == "dns.google")
+
         try await dnsClient.close().get()
-        try await group.shutdownGracefully()
+        try await server.stop()
+        try await serverGroup.shutdownGracefully()
+        try await clientGroup.shutdownGracefully()
     }
 
     @Test("IPv4 Inverse Address with Multiple Responses")
     func ipv4InverseAddressMultipleResponses() async throws {
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let serverGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let clientGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-        let dnsClient = try await DNSClient.connect(on: group, host: "8.8.8.8").get()
+        // CHANGE: make this deterministic and independent from public DNS behavior.
+        let owner = "222.222.67.208.in-addr.arpa"
+        let ownerLabels = owner.split(separator: ".").map(String.init).map(DNSLabel.init) + [DNSLabel(stringLiteral: "")]
+
+        func ptr(_ host: String) -> Record {
+            .ptr(ResourceRecord(
+                domainName: ownerLabels,
+                dataType: DNSResourceType.ptr.rawValue,
+                dataClass: DataClass.internet.rawValue,
+                ttl: 300,
+                resource: PTRRecord(domainName: host.split(separator: ".").map(String.init).map(DNSLabel.init) + [DNSLabel(stringLiteral: "")])
+            ))
+        }
+
+        let delegate = MockDNSDelegate(responses: [owner: [
+            ptr("dns.opendns.com"),
+            ptr("dns.sse.cisco.com"),
+            ptr("resolver1.opendns.com"),
+            ptr("dns.umbrella.com"),
+        ]])
+        let config = DNSServerConfiguration(
+            host: "127.0.0.1",
+            port: 0,
+            enableUDP: true,
+            enableTCP: false
+        )
+        let server = DNSServer(configuration: config, delegate: delegate, eventLoopGroup: serverGroup)
+        try await server.start()
+
+        guard let port = server.udpPort else {
+            Issue.record("Server did not bind to UDP port")
+            return
+        }
+
+        let address = try SocketAddress(ipAddress: "127.0.0.1", port: port)
+        let dnsClient = try await DNSClient.connect(on: clientGroup, config: [address]).get()
         let answers = try await dnsClient.ipv4InverseAddress("208.67.222.222").get()
 
-        #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        #expect(answers.count == 4)
+        let names = answers.map { $0.resource.domainName.string }.sorted()
+        #expect(names == [
+            "dns.opendns.com",
+            "dns.sse.cisco.com",
+            "dns.umbrella.com",
+            "resolver1.opendns.com",
+        ])
+
         try await dnsClient.close().get()
-        try await group.shutdownGracefully()
+        try await server.stop()
+        try await serverGroup.shutdownGracefully()
+        try await clientGroup.shutdownGracefully()
     }
 
     @Test("IPv6 Inverse Address")
     func ipv6InverseAddress() async throws {
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let serverGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let clientGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-        let dnsClient = try await DNSClient.connect(on: group, host: "8.8.8.8").get()
-        // j.root-servers.net operated by Verisign, Inc.
+        // CHANGE: keep this test deterministic by using a local mock DNS server instead of public DNS.
+        let owner = "0.3.0.0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.7.2.c.0.3.0.5.0.1.0.0.2.ip6.arpa"
+        let ownerLabels = owner.split(separator: ".").map(String.init).map(DNSLabel.init) + [DNSLabel(stringLiteral: "")]
+        let ptrRecord = ResourceRecord(
+            domainName: ownerLabels,
+            dataType: DNSResourceType.ptr.rawValue,
+            dataClass: DataClass.internet.rawValue,
+            ttl: 300,
+            resource: PTRRecord(domainName: ["j", "root-servers", "net", ""])
+        )
+
+        let delegate = MockDNSDelegate(responses: [owner: [.ptr(ptrRecord)]])
+        let config = DNSServerConfiguration(
+            host: "127.0.0.1",
+            port: 0,
+            enableUDP: true,
+            enableTCP: false
+        )
+        let server = DNSServer(configuration: config, delegate: delegate, eventLoopGroup: serverGroup)
+        try await server.start()
+
+        guard let port = server.udpPort else {
+            Issue.record("Server did not bind to UDP port")
+            return
+        }
+
+        let address = try SocketAddress(ipAddress: "127.0.0.1", port: port)
+        let dnsClient = try await DNSClient.connect(on: clientGroup, config: [address]).get()
         let answers = try await dnsClient.ipv6InverseAddress("2001:503:c27::2:30").get()
 
-        #expect(answers.count >= 1, "The returned answers should be greater than or equal to 1")
+        #expect(answers.count == 1)
+        #expect(answers.first?.resource.domainName.string == "j.root-servers.net")
+
         try await dnsClient.close().get()
-        try await group.shutdownGracefully()
+        try await server.stop()
+        try await serverGroup.shutdownGracefully()
+        try await clientGroup.shutdownGracefully()
     }
 
     @Test("IPv6 Inverse Address with Invalid Input")
