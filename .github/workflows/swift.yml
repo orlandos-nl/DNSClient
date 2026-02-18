@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        image: ["swift:5.10", "swift:6.0", "swift:6.1", "swiftlang/swift:nightly-6.2-jammy"]
+        image: ["swift:6.0", "swift:6.1", "swiftlang/swift:nightly-6.2-jammy"]
     container:
       image: ${{ matrix.image }}
     steps:
@@ -32,6 +32,6 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run tests
         run: swift test
