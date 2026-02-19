@@ -130,11 +130,15 @@ extension DNSClient {
         }
     }
     
-    /// Request SRV records from a host
+    /// Request SRV records from a host.
+    ///
+    /// - Note: This returns SRV records as received and does not apply RFC 2782
+    ///         dot-target semantics or ordering. Use `resolveSRV(from:)` for the
+    ///         RFC-compliant resolution flow.
     ///
     /// - parameters:
     ///     - host: Hostname to get the records from
-    /// - returns: A future with the resource record
+    /// - returns: A future with the resource records
     public func getSRVRecords(from host: String) -> EventLoopFuture<[ResourceRecord<SRVRecord>]> {
         return self.sendQuery(forHost: host, type: .srv).map { message in
             return message.answers.compactMap { answer in
@@ -144,6 +148,104 @@ extension DNSClient {
 
                 return record
             }
+        }
+    }
+
+    /// Resolve SRV records for a host and return ordered targets with resolved addresses.
+    ///
+    /// This performs the full RFC 2782 flow:
+    /// 1) Query SRV records.
+    /// 2) Apply dot-target semantics (single “.” = service unavailable; ignore “.” when others exist).
+    /// 3) Apply RFC 2782 ordering (priority + weighted selection).
+    /// 4) Use A/AAAA records from the Additional section when present.
+    /// 5) Query A/AAAA for targets missing Additional addresses and merge results.
+    ///
+    /// - Parameter host: The service host name (e.g. `_xmpp-client._tcp.example.com`).
+    /// - Returns: A future containing SRV records with resolved IP addresses in RFC order.
+    public func resolveSRV(from host: String) -> EventLoopFuture<[SRVResolved]> {
+        return self.sendQuery(forHost: host, type: .srv).flatMap { message in
+            let srvRecords: [ResourceRecord<SRVRecord>] = message.answers.compactMap { answer in
+                guard case .srv(let record) = answer else { return nil }
+                return record
+            }
+
+            let filtered: [ResourceRecord<SRVRecord>]
+            do {
+                filtered = try applyDotTargetSemantics(srvRecords)
+            } catch {
+                return self.channel.eventLoop.makeFailedFuture(error)
+            }
+
+            let ordered = rfc2782Order(filtered)
+            let additionalInfo = additionalInfoForSRVTargets(
+                ordered,
+                additionalRecords: message.additionalData
+            )
+
+            let additionalAddresses = additionalInfo.addressesByTarget
+            let targetsNeedingLookup = additionalInfo.targetsNeedingLookup
+
+            let loop = self.channel.eventLoop
+            guard !targetsNeedingLookup.isEmpty else {
+                return loop.makeSucceededFuture(
+                    Self.buildResolved(
+                        from: ordered,
+                        addressesByTarget: additionalAddresses,
+                        additionalTargets: Set(additionalAddresses.keys)
+                    )
+                )
+            }
+
+            let lookupFutures: [EventLoopFuture<(String, [String])>] = targetsNeedingLookup.map { target in
+                let a = self.resolveAAddresses(host: target)
+                let aaaa = self.resolveAAAAAddresses(host: target)
+                return a.and(aaaa).map { (aList, aaaaList) in
+                    (target, aList + aaaaList)
+                }
+            }
+
+            return EventLoopFuture.whenAllSucceed(lookupFutures, on: loop).map { lookups in
+                var merged = additionalAddresses
+                for (target, addresses) in lookups {
+                    if !addresses.isEmpty {
+                        merged[target, default: []].append(contentsOf: addresses)
+                    }
+                }
+
+                return Self.buildResolved(
+                    from: ordered,
+                    addressesByTarget: merged,
+                    additionalTargets: Set(additionalAddresses.keys)
+                )
+            }
+        }
+    }
+
+    /// Resolve SRV records and attempt to connect in RFC 2782 order.
+    ///
+    /// This is a convenience wrapper around `resolveSRV(from:)` that tries each
+    /// resolved address in order until one succeeds.
+    ///
+    /// - Parameters:
+    ///   - host: The service host name (e.g. `_xmpp-client._tcp.example.com`).
+    ///   - connector: A closure that attempts a connection to a `SocketAddress`.
+    /// - Returns: The first successful connection result, or an `SRVError`.
+    public func srvConnect<T: Sendable>(
+        from host: String,
+        connector: @escaping @Sendable (SocketAddress) -> EventLoopFuture<T>
+    ) -> EventLoopFuture<T> {
+        let loop = self.channel.eventLoop
+        return resolveSRV(from: host).flatMap { resolved in
+            let addresses = resolved.flatMap { $0.addresses }
+            return Self.connectInOrder(addresses: addresses, on: loop, connector: connector)
+        }.flatMapError { error in
+            if let srvError = error as? SRVError {
+                return loop.makeFailedFuture(srvError)
+            }
+            if error is SRVServiceUnavailable {
+                return loop.makeFailedFuture(SRVError.serviceUnavailable)
+            }
+            return loop.makeFailedFuture(SRVError.connectFailed(lastError: error))
         }
     }
 
@@ -175,5 +277,80 @@ extension DNSClient {
                 return record
             }
         }
+    }
+}
+
+// MARK: - SRV resolution helpers
+
+extension DNSClient {
+    private func resolveAAddresses(host: String) -> EventLoopFuture<[String]> {
+        return self.sendQuery(forHost: host, type: .a).map { message in
+            message.answers.compactMap { answer in
+                guard case .a(let record) = answer else { return nil }
+                return record.resource.stringAddress
+            }
+        }
+    }
+
+    private func resolveAAAAAddresses(host: String) -> EventLoopFuture<[String]> {
+        return self.sendQuery(forHost: host, type: .aaaa).map { message in
+            message.answers.compactMap { answer in
+                guard case .aaaa(let record) = answer else { return nil }
+                return record.resource.stringAddress
+            }
+        }
+    }
+
+    private static func buildResolved(
+        from records: [ResourceRecord<SRVRecord>],
+        addressesByTarget: [String: [String]],
+        additionalTargets: Set<String>
+    ) -> [SRVResolved] {
+        return records.map { record in
+            let targetKey = normalizedDomainName(record.resource.domainName)
+            let addressStrings = addressesByTarget[targetKey] ?? []
+            let port = Int(record.resource.port)
+            let socketAddresses = addressStrings.compactMap { try? SocketAddress(ipAddress: $0, port: port) }
+            let fromAdditional = additionalTargets.contains(targetKey)
+            return SRVResolved(record: record, addresses: socketAddresses, fromAdditional: fromAdditional)
+        }
+    }
+}
+
+extension DNSClient {
+    internal static func connectInOrder<T: Sendable>(
+        addresses: [SocketAddress],
+        on loop: EventLoop,
+        connector: @escaping @Sendable (SocketAddress) -> EventLoopFuture<T>
+    ) -> EventLoopFuture<T> {
+        guard !addresses.isEmpty else {
+            return loop.makeFailedFuture(SRVError.noRecords)
+        }
+
+        let promise = loop.makePromise(of: T.self)
+
+        @Sendable
+        func attempt(_ index: Int, lastError: Error?) {
+            guard index < addresses.count else {
+                if let lastError {
+                    promise.fail(SRVError.connectFailed(lastError: lastError))
+                } else {
+                    promise.fail(SRVError.noRecords)
+                }
+                return
+            }
+
+            connector(addresses[index]).hop(to: loop).whenComplete { result in
+                switch result {
+                case .success(let value):
+                    promise.succeed(value)
+                case .failure(let error):
+                    attempt(index + 1, lastError: error)
+                }
+            }
+        }
+
+        attempt(0, lastError: nil)
+        return promise.futureResult
     }
 }
