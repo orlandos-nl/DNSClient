@@ -42,8 +42,18 @@ public final class DNSDecoder: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
-        // Check multicast cache first - accumulate responses
+        // Check multicast cache first - accumulate responses.
+        // RFC 6762 §18.1: mDNS responses MUST have ID=0, so we cannot match
+        // by transaction ID. When ID is 0, deliver to all pending multicast queries.
         let handledByMulticast = multicastCache.withLockedValue { cache -> Bool in
+            if message.header.id == 0 {
+                // mDNS response with ID=0 — deliver to all pending queries
+                guard !cache.isEmpty else { return false }
+                for query in cache.values {
+                    query.addResponse(message)
+                }
+                return true
+            }
             guard let query = cache[message.header.id] else {
                 return false
             }

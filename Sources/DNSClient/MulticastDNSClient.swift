@@ -50,6 +50,8 @@ public final class MulticastDNSClient: DNSClient, @unchecked Sendable {
     /// collects all responses received within the specified timeout period.
     /// This is useful for mDNS where multiple devices may respond to the same query.
     ///
+    /// Per RFC 6762 §18.1, the query ID is set to zero for multicast queries.
+    ///
     /// - Parameters:
     ///     - address: The hostname address to request a certain resource from
     ///     - type: The resource you want to request
@@ -63,11 +65,9 @@ public final class MulticastDNSClient: DNSClient, @unchecked Sendable {
         timeout: TimeAmount = .seconds(5)
     ) -> EventLoopFuture<[Message]> {
         channel.eventLoop.flatSubmit {
-            let messageID = self.messageID.withLockedValue { id in
-                let newID = id &+ 1
-                id = newID
-                return id
-            }
+            // RFC 6762 §18.1: "In multicast query messages, the Query Identifier
+            // SHOULD be set to zero on transmission."
+            let messageID: UInt16 = 0
 
             var options: MessageOptions = [.standardQuery]
 
