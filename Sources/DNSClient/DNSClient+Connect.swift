@@ -152,35 +152,54 @@ extension DNSClient {
                 port: 5353
             )
 
-            return connect(on: group, config: [address]).flatMap { client in
-                let channel = client.channel as! MulticastChannel
-                let multicastClient = MulticastDNSClient(
-                    channel: channel,
-                    address: address,
-                    decoder: client.dnsDecoder
-                )
-                let joinFuture = channel.joinGroup(address, device: interface)
+            // Create the channel directly instead of going through connect(),
+            // which returns an intermediate DNSClient whose deinit would close
+            // the shared channel.
+            let dnsDecoder = DNSDecoder(group: group)
 
-                guard let interface = interface, let ifAddr = interface.address else {
-                    return joinFuture.map { multicastClient }
+            let bootstrap = DatagramBootstrap(group: group)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEPORT), value: 1)
+                .channelInitializer { channel in
+                    return channel.pipeline.addHandlers(
+                        EnvelopeInboundChannel(),
+                        dnsDecoder,
+                        EnvelopeOutboundChannel(address: address),
+                        DNSEncoder()
+                    )
                 }
 
-                let provider = client.channel as! SocketOptionProvider
+            return bootstrap.bind(host: useIPv6 ? "::" : "0.0.0.0", port: 0).flatMap { channel in
+                let multicastChannel = channel as! MulticastChannel
+                let client = MulticastDNSClient(
+                    channel: channel,
+                    address: address,
+                    decoder: dnsDecoder
+                )
+                dnsDecoder.mainClient = client
+
+                let joinFuture = multicastChannel.joinGroup(address, device: interface)
+
+                guard let interface = interface, let ifAddr = interface.address else {
+                    return joinFuture.map { client }
+                }
+
+                let provider = channel as! SocketOptionProvider
                 switch ifAddr {
                 case .v4(let v4):
                     // RFC 6762 §14: Pin outbound multicast to this IPv4 interface
                     // so queries leave on the correct NIC rather than the kernel default.
                     return joinFuture.flatMap {
                         provider.setIPMulticastIF(v4.address.sin_addr)
-                    }.map { multicastClient }
+                    }.map { client }
                 case .v6:
                     // RFC 6762 §20: For IPv6, set IPV6_MULTICAST_IF using the
                     // interface index so outbound queries use the correct link.
                     return joinFuture.flatMap {
                         provider.setIPv6MulticastIF(CUnsignedInt(interface.interfaceIndex))
-                    }.map { multicastClient }
+                    }.map { client }
                 default:
-                    return joinFuture.map { multicastClient }
+                    return joinFuture.map { client }
                 }
             }
         } catch {
